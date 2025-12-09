@@ -67,6 +67,20 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
     setShowSizeDropdown(false);
   };
 
+  const getAspectRatioStyle = () => {
+    if (data.type === NodeType.VIDEO) {
+      // Default video player aspect ratio
+      return { aspectRatio: '16/9' }; 
+    }
+    
+    // For images, use the selected ratio or 1:1 default
+    const ratio = data.aspectRatio || 'Auto';
+    if (ratio === 'Auto') return { aspectRatio: '1/1' };
+    
+    const [w, h] = ratio.split(':');
+    return { aspectRatio: `${w}/${h}` };
+  };
+
   const currentSizeLabel = data.type === NodeType.VIDEO 
     ? (data.resolution || "Auto") 
     : (data.aspectRatio || "Auto");
@@ -109,7 +123,10 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
         <div className={`transition-all duration-200 ${!selected ? 'p-0 rounded-2xl overflow-hidden' : 'p-1'}`}>
           {/* Result View */}
           {isSuccess && data.resultUrl ? (
-            <div className={`relative w-full aspect-video bg-black group/image ${!selected ? '' : 'rounded-xl overflow-hidden'}`}>
+            <div 
+                className={`relative w-full bg-black group/image ${!selected ? '' : 'rounded-xl overflow-hidden'}`}
+                style={getAspectRatioStyle()}
+            >
               {data.type === NodeType.VIDEO ? (
                  <video src={data.resultUrl} controls autoPlay loop className="w-full h-full object-cover" onPointerDown={(e) => e.stopPropagation()} />
               ) : (
@@ -174,7 +191,7 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
               rows={2}
               value={data.prompt}
               onChange={(e) => onUpdate(data.id, { prompt: e.target.value })}
-              disabled={isLoading || isSuccess} 
+              disabled={isLoading} 
             />
 
             {data.errorMessage && (
@@ -230,18 +247,17 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
                 </div>
                 
                 {/* Generate Button */}
-                {!isSuccess && !isLoading && (
+                {!isLoading && (
                   <button 
                     onClick={(e) => { e.stopPropagation(); onGenerate(data.id); }}
-                    className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-900/20 transition-all hover:scale-105"
+                    className={`w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-105 ${
+                        isSuccess 
+                            ? 'bg-green-600 hover:bg-green-500 text-white shadow-green-900/20' 
+                            : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/20'
+                    }`}
                   >
-                    <Sparkles size={14} fill="currentColor" />
+                    <Sparkles size={14} fill={isSuccess ? "currentColor" : "currentColor"} />
                   </button>
-                )}
-                {isSuccess && (
-                    <div className="w-8 h-8 rounded-full bg-green-600/20 text-green-500 flex items-center justify-center">
-                      <Sparkles size={14} />
-                    </div>
                 )}
               </div>
             </div>
