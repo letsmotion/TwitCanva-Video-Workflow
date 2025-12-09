@@ -9,12 +9,14 @@ import {
   Image as ImageIcon, 
   Plus,
   Check,
-  ChevronDown
+  ChevronDown,
+  Film
 } from 'lucide-react';
 import { NodeData, NodeStatus, NodeType } from '../types';
 
 interface CanvasNodeProps {
   data: NodeData;
+  inputUrl?: string; // Result from parent node (e.g., Image for Image-to-Video)
   onUpdate: (id: string, updates: Partial<NodeData>) => void;
   onGenerate: (id: string) => void;
   onAddNext: (id: string, type: 'left' | 'right') => void;
@@ -33,6 +35,7 @@ const VIDEO_RESOLUTIONS = [
 
 export const CanvasNode: React.FC<CanvasNodeProps> = ({ 
   data, 
+  inputUrl,
   onUpdate, 
   onGenerate, 
   onAddNext,
@@ -145,34 +148,46 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
             </div>
           ) : (
             /* Placeholder / Empty State */
-            <div className={`relative w-full aspect-[4/3] bg-[#141414] flex flex-col items-center justify-center gap-3 
+            <div className={`relative w-full aspect-[4/3] bg-[#141414] flex flex-col items-center justify-center gap-3 overflow-hidden
                 ${isLoading ? 'animate-pulse' : ''} 
                 ${!selected ? 'rounded-2xl' : 'rounded-xl border border-dashed border-neutral-800'}`
             }>
+               {/* Input Image Preview for Video Nodes */}
+               {data.type === NodeType.VIDEO && inputUrl && (
+                  <div className="absolute inset-0 z-0">
+                    <img src={inputUrl} alt="Input Frame" className="w-full h-full object-cover opacity-30 blur-sm" />
+                    <div className="absolute inset-0 bg-black/40" />
+                    <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 rounded text-[10px] text-white font-medium flex items-center gap-1">
+                      <ImageIcon size={10} />
+                      Input Frame
+                    </div>
+                  </div>
+               )}
+
                {isLoading ? (
-                 <div className="flex flex-col items-center gap-2">
+                 <div className="relative z-10 flex flex-col items-center gap-2">
                    <Loader2 size={32} className="animate-spin text-blue-400" />
-                   <span className="text-xs text-neutral-500">Generating...</span>
+                   <span className="text-xs text-neutral-500 font-medium">Generating...</span>
                  </div>
                ) : (
-                 <>
+                 <div className="relative z-10 flex flex-col items-center gap-3">
                    <div className="text-neutral-700">
-                     {data.type === NodeType.VIDEO ? <ArrowRight size={40} /> : <ImageIcon size={40} />}
+                     {data.type === NodeType.VIDEO ? <Film size={40} /> : <ImageIcon size={40} />}
                    </div>
                    {selected && (
                      <>
                         <div className="text-neutral-500 text-sm font-medium">
-                          {data.type === NodeType.VIDEO ? "Waiting for input..." : "Try to:"}
+                          {data.type === NodeType.VIDEO && inputUrl ? "Ready to animate" : (data.type === NodeType.VIDEO ? "Waiting for input..." : "Try to:")}
                         </div>
                         {data.type !== NodeType.VIDEO && (
-                          <div className="flex flex-col gap-1 text-xs text-neutral-600">
+                          <div className="flex flex-col gap-1 text-xs text-neutral-600 text-center">
                               <span>• Image to Image</span>
                               <span>• Image to Video</span>
                           </div>
                         )}
                      </>
                    )}
-                 </>
+                 </div>
                )}
             </div>
           )}
@@ -187,11 +202,11 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
           >
             <textarea 
               className="w-full bg-transparent text-sm text-white placeholder-neutral-600 outline-none resize-none mb-3 font-light"
-              placeholder="Describe what you want to generate..."
+              placeholder={data.type === NodeType.VIDEO && inputUrl ? "Describe how to animate this frame..." : "Describe what you want to generate..."}
               rows={2}
               value={data.prompt}
               onChange={(e) => onUpdate(data.id, { prompt: e.target.value })}
-              disabled={isLoading} 
+              // Always allow editing, even if loading or success, to support re-generation
             />
 
             {data.errorMessage && (
@@ -206,7 +221,9 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
                 {/* Model Selector */}
                 <button className="flex items-center gap-1.5 text-xs text-neutral-300 hover:bg-neutral-800 px-2 py-1.5 rounded-lg transition-colors">
                   <Banana size={12} className="text-yellow-400" />
-                  <span className="font-medium">Banana Pro</span>
+                  <span className="font-medium">
+                     {data.type === NodeType.VIDEO ? "Veo 3.1" : "Banana Pro"}
+                  </span>
                   <Settings2 size={12} className="ml-1 opacity-50" />
                 </button>
               </div>
@@ -246,7 +263,7 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
                   )}
                 </div>
                 
-                {/* Generate Button */}
+                {/* Generate Button - Active even after success to allow re-generation */}
                 {!isLoading && (
                   <button 
                     onClick={(e) => { e.stopPropagation(); onGenerate(data.id); }}

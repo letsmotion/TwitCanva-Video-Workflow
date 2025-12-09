@@ -502,6 +502,8 @@ export default function App() {
                      <CanvasNode 
                         key={node.id} 
                         data={node} 
+                        // Pass input URL (e.g., from parent) for things like Image-to-Video preview
+                        inputUrl={nodes.find(n => n.id === node.parentId)?.resultUrl}
                         onUpdate={handleUpdateNode}
                         onGenerate={handleGenerate}
                         onAddNext={handleAddNext}
