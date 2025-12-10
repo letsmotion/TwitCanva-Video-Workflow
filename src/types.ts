@@ -18,6 +18,7 @@ export enum NodeStatus {
 export interface NodeData {
   id: string;
   type: NodeType;
+  title?: string; // Custom title for the node (defaults to type if not set)
   x: number;
   y: number;
   prompt: string;

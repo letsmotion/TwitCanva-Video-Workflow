@@ -39,12 +39,33 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
   isHoveredForConnection
 }) => {
   // ============================================================================
-  // STATE HELPERS
+  // STATE
   // ============================================================================
+
+  const [isEditingTitle, setIsEditingTitle] = React.useState(false);
+  const [editedTitle, setEditedTitle] = React.useState(data.title || data.type);
+  const titleInputRef = React.useRef<HTMLInputElement>(null);
 
   const isIdle = data.status === NodeStatus.IDLE || data.status === NodeStatus.ERROR;
   const isLoading = data.status === NodeStatus.LOADING;
   const isSuccess = data.status === NodeStatus.SUCCESS;
+
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+
+  // Focus input when entering edit mode
+  React.useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [isEditingTitle]);
+
+  // Update local state when data.title changes
+  React.useEffect(() => {
+    setEditedTitle(data.title || data.type);
+  }, [data.title, data.type]);
 
   // ============================================================================
   // HELPERS
@@ -52,16 +73,24 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
 
   const getAspectRatioStyle = () => {
     if (data.type === NodeType.VIDEO) {
-      // Default video player aspect ratio
       return { aspectRatio: '16/9' };
     }
 
-    // For images, use the selected ratio or 1:1 default
     const ratio = data.aspectRatio || 'Auto';
     if (ratio === 'Auto') return { aspectRatio: '1/1' };
 
     const [w, h] = ratio.split(':');
     return { aspectRatio: `${w}/${h}` };
+  };
+
+  const handleTitleSave = () => {
+    setIsEditingTitle(false);
+    const trimmed = editedTitle.trim();
+    if (trimmed && trimmed !== data.type) {
+      onUpdate(data.id, { title: trimmed });
+    } else if (!trimmed) {
+      setEditedTitle(data.title || data.type);
+    }
   };
 
   // ============================================================================
@@ -83,14 +112,41 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
 
       {/* Main Node Card */}
       <div
-        className={`relative w-[340px] rounded-2xl bg-[#0f0f0f] border transition-all duration-200 flex flex-col shadow-2xl ${selected ? 'border-blue-500/50 ring-1 ring-blue-500/30' : 'border-transparent'
-          }`}
+        className={`relative w-[340px] rounded-2xl bg-[#0f0f0f] border transition-all duration-200 flex flex-col shadow-2xl ${selected ? 'border-blue-500/50 ring-1 ring-blue-500/30' : 'border-transparent'}`}
       >
-        {/* Header (Type Label) */}
-        <div className={`absolute -top-7 left-0 text-xs px-2 py-0.5 rounded font-medium transition-colors ${selected ? 'bg-blue-500/20 text-blue-200' : 'text-neutral-600'
-          }`}>
-          {data.type}
-        </div>
+        {/* Header (Editable Title) */}
+        {isEditingTitle ? (
+          <input
+            ref={titleInputRef}
+            type="text"
+            value={editedTitle}
+            onChange={(e) => setEditedTitle(e.target.value)}
+            onBlur={handleTitleSave}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleTitleSave();
+              } else if (e.key === 'Escape') {
+                setEditedTitle(data.title || data.type);
+                setIsEditingTitle(false);
+              }
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="absolute -top-7 left-0 text-xs px-2 py-0.5 rounded font-medium bg-blue-500/20 text-blue-200 outline-none border border-blue-400"
+            style={{ minWidth: '60px' }}
+          />
+        ) : (
+          <div
+            className={`absolute -top-7 left-0 text-xs px-2 py-0.5 rounded font-medium transition-colors cursor-text ${selected ? 'bg-blue-500/20 text-blue-200' : 'text-neutral-600'}`}
+            onDoubleClick={(e) => {
+              e.stopPropagation();
+              setIsEditingTitle(true);
+            }}
+            title="Double-click to edit"
+          >
+            {data.title || data.type}
+          </div>
+        )}
 
         {/* Content Area */}
         <NodeContent
