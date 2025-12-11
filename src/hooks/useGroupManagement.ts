@@ -134,6 +134,17 @@ export const useGroupManagement = () => {
         return allInSameGroup ? firstNodeGroup : undefined;
     };
 
+    /**
+     * Renames a group
+     * @param groupId - ID of the group to rename
+     * @param newLabel - New label for the group
+     */
+    const renameGroup = (groupId: string, newLabel: string): void => {
+        setGroups(prev => prev.map(g =>
+            g.id === groupId ? { ...g, label: newLabel } : g
+        ));
+    };
+
     // ============================================================================
     // RETURN
     // ============================================================================
@@ -145,6 +156,7 @@ export const useGroupManagement = () => {
         cleanupInvalidGroups,
         getGroupByNodeId,
         getGroupById,
-        getCommonGroup
+        getCommonGroup,
+        renameGroup
     };
 };

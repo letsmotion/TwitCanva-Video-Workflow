@@ -5,7 +5,7 @@
  * Shows "Group" button for multi-selection and group toolbar when grouped.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { NodeData, NodeGroup } from '../../types';
 
 interface SelectionBoundingBoxProps {
@@ -15,6 +15,7 @@ interface SelectionBoundingBoxProps {
     onGroup: () => void;
     onUngroup: () => void;
     onBoundingBoxPointerDown: (e: React.PointerEvent) => void;
+    onRenameGroup?: (groupId: string, newLabel: string) => void;
 }
 
 export const SelectionBoundingBox: React.FC<SelectionBoundingBoxProps> = ({
@@ -23,8 +24,15 @@ export const SelectionBoundingBox: React.FC<SelectionBoundingBoxProps> = ({
     viewport,
     onGroup,
     onUngroup,
-    onBoundingBoxPointerDown
+    onBoundingBoxPointerDown,
+    onRenameGroup
 }) => {
+    // ============================================================================
+    // STATE
+    // ============================================================================
+
+    const [isEditingLabel, setIsEditingLabel] = useState(false);
+    const [editedLabel, setEditedLabel] = useState('');
     // ============================================================================
     // CALCULATIONS
     // ============================================================================
@@ -99,11 +107,41 @@ export const SelectionBoundingBox: React.FC<SelectionBoundingBoxProps> = ({
 
             {/* Group Label (when grouped) */}
             {isGrouped && group && (
-                <div
-                    className="absolute -top-8 left-0 text-sm font-medium text-white bg-indigo-600 px-3 py-1 rounded pointer-events-auto"
-                >
-                    {group.label}
-                </div>
+                isEditingLabel ? (
+                    <input
+                        type="text"
+                        value={editedLabel}
+                        onChange={(e) => setEditedLabel(e.target.value)}
+                        onBlur={() => {
+                            if (editedLabel.trim() && onRenameGroup) {
+                                onRenameGroup(group.id, editedLabel.trim());
+                            }
+                            setIsEditingLabel(false);
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                if (editedLabel.trim() && onRenameGroup) {
+                                    onRenameGroup(group.id, editedLabel.trim());
+                                }
+                                setIsEditingLabel(false);
+                            } else if (e.key === 'Escape') {
+                                setIsEditingLabel(false);
+                            }
+                        }}
+                        autoFocus
+                        className="absolute -top-8 left-0 text-sm font-medium text-white bg-indigo-600 px-3 py-1 rounded pointer-events-auto outline-none"
+                    />
+                ) : (
+                    <div
+                        className="absolute -top-8 left-0 text-sm font-medium text-white bg-indigo-600 px-3 py-1 rounded pointer-events-auto cursor-text"
+                        onDoubleClick={() => {
+                            setEditedLabel(group.label);
+                            setIsEditingLabel(true);
+                        }}
+                    >
+                        {group.label}
+                    </div>
+                )
             )}
 
             {/* Group Button (when multiple nodes selected but not grouped) */}

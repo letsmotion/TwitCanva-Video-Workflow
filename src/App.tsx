@@ -107,7 +107,8 @@ export default function App() {
     groupNodes,
     ungroupNodes,
     cleanupInvalidGroups,
-    getCommonGroup
+    getCommonGroup,
+    renameGroup
   } = useGroupManagement();
 
   // History for undo/redo
@@ -557,6 +558,7 @@ export default function App() {
                   handleNodePointerDown(e, selectedNodeIds[0], undefined);
                 }
               }}
+              onRenameGroup={renameGroup}
             />
           )}
 
@@ -589,6 +591,7 @@ export default function App() {
                     handleNodePointerDown(e, nodeIds[0], undefined);
                   }
                 }}
+                onRenameGroup={renameGroup}
               />
             );
           })}
