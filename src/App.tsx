@@ -608,21 +608,7 @@ export default function App() {
             ))}
           </div>
 
-          {/* Selection Box Overlay */}
-          {selectionBox.isActive && (
-            <div
-              className="absolute pointer-events-none"
-              style={{
-                left: Math.min(selectionBox.startX, selectionBox.endX),
-                top: Math.min(selectionBox.startY, selectionBox.endY),
-                width: Math.abs(selectionBox.endX - selectionBox.startX),
-                height: Math.abs(selectionBox.endY - selectionBox.startY),
-                border: '2px solid #3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                zIndex: 1000
-              }}
-            />
-          )}
+
 
           {/* Selection Bounding Box - for selected nodes (2 or more) */}
           {selectedNodeIds.length > 1 && !selectionBox.isActive && (
@@ -681,6 +667,22 @@ export default function App() {
           })}
         </div>
       </div >
+
+      {/* Selection Box Overlay - Outside transformed canvas for screen-space coordinates */}
+      {selectionBox.isActive && (
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            left: Math.min(selectionBox.startX, selectionBox.endX),
+            top: Math.min(selectionBox.startY, selectionBox.endY),
+            width: Math.abs(selectionBox.endX - selectionBox.startX),
+            height: Math.abs(selectionBox.endY - selectionBox.startY),
+            border: '2px solid #3b82f6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            zIndex: 1000
+          }}
+        />
+      )}
 
       {/* Context Menu */}
       < ContextMenu
