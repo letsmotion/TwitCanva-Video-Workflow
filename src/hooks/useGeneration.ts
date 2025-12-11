@@ -32,7 +32,7 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
         updateNode(id, { status: NodeStatus.LOADING });
 
         try {
-            if (node.type === NodeType.IMAGE) {
+            if (node.type === NodeType.IMAGE || node.type === NodeType.IMAGE_EDITOR) {
                 // Generate image
                 const resultUrl = await generateImage({
                     prompt: node.prompt,

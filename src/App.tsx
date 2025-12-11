@@ -23,6 +23,7 @@ import { useHistory } from './hooks/useHistory';
 import { extractVideoLastFrame } from './utils/videoHelpers';
 import { calculateConnectionPath } from './utils/connectionHelpers';
 import { SelectionBoundingBox } from './components/canvas/SelectionBoundingBox';
+import { ImageEditorModal } from './components/modals/ImageEditorModal';
 
 // ============================================================================
 // MAIN COMPONENT
@@ -39,6 +40,16 @@ export default function App() {
     x: 0,
     y: 0,
     type: 'global'
+  });
+
+  // Image Editor Modal state
+  const [editorModal, setEditorModal] = useState<{
+    isOpen: boolean;
+    nodeId: string | null;
+    imageUrl?: string;
+  }>({
+    isOpen: false,
+    nodeId: null
   });
 
   // ============================================================================
@@ -339,6 +350,37 @@ export default function App() {
     );
   };
 
+  // ============================================================================
+  // IMAGE EDITOR MODAL HANDLERS
+  // ============================================================================
+
+  const handleOpenImageEditor = (nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return;
+
+    // Get image from parent node if connected
+    let imageUrl: string | undefined;
+    if (node.parentId) {
+      const parentNode = nodes.find(n => n.id === node.parentId);
+      if (parentNode?.resultUrl) {
+        imageUrl = parentNode.resultUrl;
+      }
+    }
+
+    setEditorModal({
+      isOpen: true,
+      nodeId,
+      imageUrl
+    });
+  };
+
+  const handleCloseImageEditor = () => {
+    setEditorModal({
+      isOpen: false,
+      nodeId: null
+    });
+  };
+
   // Generation logic handled by useGeneration hook
 
 
@@ -520,6 +562,7 @@ export default function App() {
                 onSelect={(id) => setSelectedNodeIds([id])}
                 onConnectorDown={handleConnectorPointerDown}
                 isHoveredForConnection={hoveredNodeId === node.id}
+                onOpenEditor={handleOpenImageEditor}
               />
             ))}
           </div>
@@ -620,6 +663,13 @@ export default function App() {
         />
         <span className="text-xs text-neutral-300 w-10">{Math.round(viewport.zoom * 100)}%</span>
       </div >
+
+      <ImageEditorModal
+        isOpen={editorModal.isOpen}
+        nodeId={editorModal.nodeId || ''}
+        imageUrl={editorModal.imageUrl}
+        onClose={handleCloseImageEditor}
+      />
     </div >
   );
 }
