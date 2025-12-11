@@ -19,6 +19,7 @@ import { useNodeDragging } from './hooks/useNodeDragging';
 import { useGeneration } from './hooks/useGeneration';
 import { useSelectionBox } from './hooks/useSelectionBox';
 import { useGroupManagement } from './hooks/useGroupManagement';
+import { useHistory } from './hooks/useHistory';
 import { extractVideoLastFrame } from './utils/videoHelpers';
 import { calculateConnectionPath } from './utils/connectionHelpers';
 import { SelectionBoundingBox } from './components/canvas/SelectionBoundingBox';
@@ -86,6 +87,7 @@ export default function App() {
     startPanning,
     updatePanning,
     endPanning,
+    isDragging,
     releasePointerCapture
   } = useNodeDragging();
 
@@ -108,6 +110,16 @@ export default function App() {
     getCommonGroup
   } = useGroupManagement();
 
+  // History for undo/redo
+  const {
+    present: historyState,
+    undo,
+    redo,
+    pushHistory,
+    canUndo,
+    canRedo
+  } = useHistory({ nodes, groups }, 50);
+
   // ============================================================================
   // EFFECTS
   // ============================================================================
@@ -127,12 +139,27 @@ export default function App() {
     return () => canvas.removeEventListener('wheel', handleNativeWheel);
   }, []);
 
-  // Keyboard shortcuts for deletion and selection clearing
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeTag = document.activeElement?.tagName.toLowerCase();
       if (activeTag === 'input' || activeTag === 'textarea') return;
 
+      // Undo: Ctrl+Z (without Shift)
+      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+        return;
+      }
+
+      // Redo: Ctrl+Y or Ctrl+Shift+Z
+      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+        e.preventDefault();
+        redo();
+        return;
+      }
+
+      // Delete selected nodes or connection
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedNodeIds.length > 0) {
           deleteNodes(selectedNodeIds);
@@ -148,12 +175,39 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNodeIds, selectedConnection, deleteNodes, deleteSelectedConnection, clearSelection, clearSelectionBox]);
+  }, [selectedNodeIds, selectedConnection, deleteNodes, deleteSelectedConnection, clearSelection, clearSelectionBox, undo, redo]);
 
   // Cleanup invalid groups (groups with less than 2 nodes)
   useEffect(() => {
     cleanupInvalidGroups(nodes, setNodes);
   }, [nodes, cleanupInvalidGroups]);
+
+  // Track state changes for undo/redo (only after drag ends, not during)
+  const isApplyingHistory = React.useRef(false);
+
+  useEffect(() => {
+    // Don't push to history if we're currently applying history (undo/redo)
+    if (isApplyingHistory.current) {
+      isApplyingHistory.current = false;
+      return;
+    }
+
+    // Don't push to history while dragging (wait until drag ends)
+    if (isDragging) {
+      return;
+    }
+
+    // Push to history when nodes or groups change
+    pushHistory({ nodes, groups });
+  }, [nodes, groups, isDragging]);
+
+  // Apply history state when undo/redo is triggered
+  useEffect(() => {
+    if (historyState.nodes !== nodes) {
+      isApplyingHistory.current = true;
+      setNodes(historyState.nodes);
+    }
+  }, [historyState]);
 
   // ============================================================================
   // EVENT HANDLERS

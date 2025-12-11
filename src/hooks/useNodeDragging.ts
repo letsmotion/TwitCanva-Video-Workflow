@@ -5,7 +5,7 @@
  * Handles pointer events for dragging nodes around the canvas.
  */
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { NodeData, Viewport } from '../types';
 
 interface DragNode {
@@ -19,6 +19,7 @@ export const useNodeDragging = () => {
 
     const dragNodeRef = useRef<DragNode | null>(null);
     const isPanning = useRef<boolean>(false);
+    const [isDragging, setIsDragging] = useState<boolean>(false);
 
     // ============================================================================
     // EVENT HANDLERS
@@ -37,6 +38,7 @@ export const useNodeDragging = () => {
     ) => {
         e.stopPropagation();
         dragNodeRef.current = { id };
+        setIsDragging(true);
 
         // Select the node
         if (onSelect) {
@@ -84,6 +86,7 @@ export const useNodeDragging = () => {
      */
     const endNodeDrag = () => {
         dragNodeRef.current = null;
+        setIsDragging(false);
     };
 
     /**
@@ -140,14 +143,14 @@ export const useNodeDragging = () => {
     // ============================================================================
 
     return {
-        dragNodeRef,
-        isPanning,
         handleNodePointerDown,
         updateNodeDrag,
         endNodeDrag,
         startPanning,
         updatePanning,
         endPanning,
+        isDragging,
+        isPanning: isPanning.current,
         releasePointerCapture
     };
 };
