@@ -23,7 +23,8 @@ interface CanvasNodeProps {
   onContextMenu: (e: React.MouseEvent, id: string) => void;
   onConnectorDown: (e: React.PointerEvent, id: string, side: 'left' | 'right') => void;
   isHoveredForConnection?: boolean;
-  onOpenEditor?: (nodeId: string) => void; // NEW: For Image Editor
+  onOpenEditor?: (nodeId: string) => void;
+  onUpload?: (nodeId: string, imageDataUrl: string) => void;
 }
 
 export const CanvasNode: React.FC<CanvasNodeProps> = ({
@@ -38,7 +39,8 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
   onContextMenu,
   onConnectorDown,
   isHoveredForConnection,
-  onOpenEditor
+  onOpenEditor,
+  onUpload
 }) => {
   // ============================================================================
   // STATE
@@ -231,6 +233,7 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
           isLoading={isLoading}
           isSuccess={isSuccess}
           getAspectRatioStyle={getAspectRatioStyle}
+          onUpload={onUpload}
         />
 
         {/* Control Panel - Only show if selected */}

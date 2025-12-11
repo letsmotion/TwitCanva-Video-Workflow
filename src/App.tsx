@@ -406,6 +406,14 @@ export default function App() {
     });
   };
 
+  // Handler for image upload in Image nodes
+  const handleUpload = (nodeId: string, imageDataUrl: string) => {
+    updateNode(nodeId, {
+      resultUrl: imageDataUrl,
+      status: NodeStatus.SUCCESS
+    });
+  };
+
   // Generation logic handled by useGeneration hook
 
 
@@ -595,6 +603,7 @@ export default function App() {
                 onConnectorDown={handleConnectorPointerDown}
                 isHoveredForConnection={hoveredNodeId === node.id}
                 onOpenEditor={handleOpenImageEditor}
+                onUpload={handleUpload}
               />
             ))}
           </div>
