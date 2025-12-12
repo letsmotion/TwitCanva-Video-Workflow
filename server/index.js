@@ -5,6 +5,7 @@ import { GoogleGenAI } from '@google/genai';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import chatAgent from './agent/index.js';
 
 dotenv.config();
 
@@ -401,6 +402,68 @@ app.delete('/api/assets/:type/:id', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Delete asset error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============================================================================
+// CHAT AGENT API
+// NOTE: Currently using LangGraph.js. If more complex agent capabilities
+// are needed (multi-agent, advanced tools), consider migrating to Python.
+// ============================================================================
+
+// Send a message to the chat agent
+app.post('/api/chat', async (req, res) => {
+    try {
+        const { sessionId, message, media } = req.body;
+
+        if (!API_KEY) {
+            return res.status(500).json({ error: "Server missing API Key config" });
+        }
+
+        if (!sessionId) {
+            return res.status(400).json({ error: "sessionId is required" });
+        }
+
+        if (!message && !media) {
+            return res.status(400).json({ error: "message or media is required" });
+        }
+
+        const result = await chatAgent.sendMessage(sessionId, message, media, API_KEY);
+
+        res.json({
+            success: true,
+            response: result.response,
+            topic: result.topic,
+            messageCount: result.messageCount
+        });
+    } catch (error) {
+        console.error("Chat API Error:", error);
+        res.status(500).json({ error: error.message || "Chat failed" });
+    }
+});
+
+// List all chat sessions
+app.get('/api/chat/sessions', async (req, res) => {
+    try {
+        const sessions = chatAgent.listSessions();
+        res.json(sessions);
+    } catch (error) {
+        console.error("List sessions error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete a chat session
+app.delete('/api/chat/sessions/:id', async (req, res) => {
+    try {
+        const deleted = chatAgent.deleteSession(req.params.id);
+        if (!deleted) {
+            return res.status(404).json({ error: "Session not found" });
+        }
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Delete session error:", error);
         res.status(500).json({ error: error.message });
     }
 });

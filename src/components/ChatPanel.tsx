@@ -2,17 +2,24 @@
  * ChatPanel.tsx
  * 
  * Agent chat panel that slides in from the right side.
- * Shows greeting, inspiration suggestions, and chat input.
+ * Shows greeting, inspiration suggestions, chat messages, and input.
  * Supports drag-drop of image/video nodes from canvas.
  */
 
-import React, { useState } from 'react';
-import { X, History, MessageCircle, Paperclip, Globe, Settings, Send, Sparkles } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, History, Paperclip, Globe, Settings, Send, Sparkles, Plus, Loader2 } from 'lucide-react';
+import { ChatMessage } from './ChatMessage';
+import { useChatAgent, ChatMessage as ChatMessageType } from '../hooks/useChatAgent';
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface AttachedMedia {
     type: 'image' | 'video';
     url: string;
     nodeId: string;
+    base64?: string;
 }
 
 interface ChatPanelProps {
@@ -23,17 +30,47 @@ interface ChatPanelProps {
     onNodeDrop?: (nodeId: string, url: string, type: 'image' | 'video') => void;
 }
 
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
 export const ChatPanel: React.FC<ChatPanelProps> = ({
     isOpen,
     onClose,
     userName = 'Creator',
     isDraggingNode = false,
-    onNodeDrop
 }) => {
+    // --- State ---
     const [message, setMessage] = useState('');
     const [showTip, setShowTip] = useState(true);
     const [attachedMedia, setAttachedMedia] = useState<AttachedMedia | null>(null);
     const [isDragOver, setIsDragOver] = useState(false);
+
+    // Chat agent hook
+    const {
+        messages,
+        topic,
+        isLoading,
+        error,
+        sendMessage,
+        startNewChat,
+        hasMessages,
+    } = useChatAgent();
+
+    // Refs
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // --- Effects ---
+
+    // Auto-scroll to bottom when new messages arrive
+    useEffect(() => {
+        if (messagesEndRef.current) {
+            messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [messages]);
+
+    // --- Event Handlers ---
 
     const handleDragEnter = (e: React.DragEvent) => {
         e.preventDefault();
@@ -62,7 +99,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             try {
                 const { nodeId, url, type } = JSON.parse(nodeData);
                 if (url && (type === 'image' || type === 'video')) {
-                    setAttachedMedia({ type, url, nodeId });
+                    setAttachedMedia({ type, url, nodeId, base64: url });
                 }
             } catch (err) {
                 console.error('Failed to parse dropped node data:', err);
@@ -74,14 +111,44 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         setAttachedMedia(null);
     };
 
-    const handleSend = () => {
-        if (message.trim() || attachedMedia) {
-            console.log('Sending:', { message, attachedMedia });
-            // TODO: Implement actual send logic
-            setMessage('');
-            setAttachedMedia(null);
+    const handleSend = async () => {
+        if ((!message.trim() && !attachedMedia) || isLoading) return;
+
+        const currentMessage = message;
+        const currentMedia = attachedMedia;
+
+        // Clear input immediately for better UX
+        setMessage('');
+        setAttachedMedia(null);
+
+        // Reset textarea height
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
         }
+
+        // Hide tip after first message
+        if (showTip) {
+            setShowTip(false);
+        }
+
+        await sendMessage(
+            currentMessage,
+            currentMedia ? {
+                type: currentMedia.type,
+                url: currentMedia.url,
+                base64: currentMedia.base64,
+            } : undefined
+        );
     };
+
+    const handleNewChat = () => {
+        startNewChat();
+        setMessage('');
+        setAttachedMedia(null);
+        setShowTip(true);
+    };
+
+    // --- Render ---
 
     if (!isOpen) return null;
 
@@ -109,43 +176,102 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800">
                 <div className="flex items-center gap-3">
-                    <History size={18} className="text-neutral-400" />
+                    {/* Topic or default title */}
+                    <span className="text-white font-medium text-sm truncate max-w-[180px]">
+                        {topic || (hasMessages ? 'New Chat' : 'ImageIdeas')}
+                    </span>
                 </div>
-                <button
-                    onClick={onClose}
-                    className="p-1.5 hover:bg-neutral-800 rounded-lg transition-colors text-neutral-400 hover:text-white"
-                >
-                    <X size={18} />
-                </button>
+                <div className="flex items-center gap-1">
+                    {/* New Chat button - only show after messages exist */}
+                    {hasMessages && (
+                        <button
+                            onClick={handleNewChat}
+                            className="p-1.5 hover:bg-neutral-800 rounded-lg transition-colors text-neutral-400 hover:text-white"
+                            title="New Chat"
+                        >
+                            <Plus size={18} />
+                        </button>
+                    )}
+                    <button
+                        className="p-1.5 hover:bg-neutral-800 rounded-lg transition-colors text-neutral-400 hover:text-white"
+                        title="Chat History"
+                    >
+                        <History size={18} />
+                    </button>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 hover:bg-neutral-800 rounded-lg transition-colors text-neutral-400 hover:text-white"
+                    >
+                        <X size={18} />
+                    </button>
+                </div>
             </div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
-                {/* Greeting */}
-                <h1 className="text-2xl font-bold text-white mb-1">
-                    Hi, {userName}
-                </h1>
-                <p className="text-cyan-400 text-lg mb-6">
-                    Looking for inspiration?
-                </p>
-
-                {/* Tip Card */}
-                {showTip && (
-                    <div className="bg-neutral-800/50 rounded-2xl p-4 mb-4">
-                        <div className="bg-neutral-700/50 rounded-xl h-24 mb-3 flex items-center justify-center">
-                            <div className="text-neutral-500 text-sm">Preview Area</div>
-                        </div>
-                        <p className="text-neutral-400 text-sm leading-relaxed mb-3">
-                            Drag image/video nodes into the chat dialog to unlock advanced features like prompt generation based on node content, providing more inspiration for your creativity~
+                {/* Show greeting and tip if no messages */}
+                {!hasMessages ? (
+                    <>
+                        {/* Greeting */}
+                        <h1 className="text-2xl font-bold text-white mb-1">
+                            Hi, {userName}
+                        </h1>
+                        <p className="text-cyan-400 text-lg mb-6">
+                            Looking for inspiration?
                         </p>
-                        <div className="flex justify-end">
-                            <button
-                                onClick={() => setShowTip(false)}
-                                className="px-4 py-1.5 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-white transition-colors"
-                            >
-                                Got it
-                            </button>
-                        </div>
+
+                        {/* Tip Card */}
+                        {showTip && (
+                            <div className="bg-neutral-800/50 rounded-2xl p-4 mb-4">
+                                <div className="bg-neutral-700/50 rounded-xl h-24 mb-3 flex items-center justify-center">
+                                    <div className="text-neutral-500 text-sm">Preview Area</div>
+                                </div>
+                                <p className="text-neutral-400 text-sm leading-relaxed mb-3">
+                                    Drag image/video nodes into the chat dialog to unlock advanced features like prompt generation based on node content, providing more inspiration for your creativity~
+                                </p>
+                                <div className="flex justify-end">
+                                    <button
+                                        onClick={() => setShowTip(false)}
+                                        className="px-4 py-1.5 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-white transition-colors"
+                                    >
+                                        Got it
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    /* Chat Messages */
+                    <div className="space-y-1">
+                        {messages.map((msg: ChatMessageType) => (
+                            <ChatMessage
+                                key={msg.id}
+                                role={msg.role}
+                                content={msg.content}
+                                media={msg.media}
+                                timestamp={msg.timestamp}
+                            />
+                        ))}
+
+                        {/* Loading indicator */}
+                        {isLoading && (
+                            <div className="flex justify-start mb-4">
+                                <div className="bg-neutral-800 rounded-2xl rounded-bl-md px-4 py-3">
+                                    <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Error message */}
+                        {error && (
+                            <div className="flex justify-center mb-4">
+                                <div className="bg-red-500/20 border border-red-500/50 rounded-lg px-4 py-2 text-red-400 text-sm">
+                                    {error}
+                                </div>
+                            </div>
+                        )}
+
+                        <div ref={messagesEndRef} />
                     </div>
                 )}
             </div>
@@ -178,12 +304,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     )}
 
                     <textarea
+                        ref={textareaRef}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         placeholder="Start your journey of inspiration"
                         className="w-full bg-transparent text-white text-sm placeholder:text-neutral-500 outline-none mb-3 resize-none min-h-[24px] max-h-[120px]"
                         rows={1}
                         style={{ scrollbarWidth: 'none' }}
+                        disabled={isLoading}
                         onInput={(e) => {
                             const target = e.target as HTMLTextAreaElement;
                             target.style.height = 'auto';
@@ -200,11 +328,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     />
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-sm text-neutral-300 transition-colors">
-                                <MessageCircle size={14} />
-                                Chat Mode
-                                <span className="text-neutral-500">▾</span>
-                            </button>
                             <button className="p-1.5 hover:bg-neutral-700 rounded-lg transition-colors text-neutral-400">
                                 <Paperclip size={16} />
                             </button>
@@ -218,9 +341,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                             </button>
                             <button
                                 onClick={handleSend}
-                                className="p-2 bg-cyan-500 hover:bg-cyan-400 rounded-full transition-colors text-white"
+                                disabled={isLoading || (!message.trim() && !attachedMedia)}
+                                className={`p-2 rounded-full transition-colors text-white ${isLoading || (!message.trim() && !attachedMedia)
+                                        ? 'bg-neutral-600 cursor-not-allowed'
+                                        : 'bg-cyan-500 hover:bg-cyan-400'
+                                    }`}
                             >
-                                <Send size={14} />
+                                {isLoading ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                ) : (
+                                    <Send size={14} />
+                                )}
                             </button>
                         </div>
                     </div>
@@ -229,6 +360,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
     );
 };
+
+// ============================================================================
+// CHAT BUBBLE
+// ============================================================================
 
 /**
  * ChatBubble - Floating button to open chat
