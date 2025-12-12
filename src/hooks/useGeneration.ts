@@ -87,9 +87,31 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
                 saveAsset('images', resultUrl, node.prompt);
 
             } else if (node.type === NodeType.VIDEO) {
-                // Get first parent image for video generation
+                // Get first parent image for video generation (start frame)
                 let imageBase64: string | undefined;
-                if (node.parentIds && node.parentIds.length > 0) {
+                let lastFrameBase64: string | undefined;
+
+                // Check for frame-to-frame mode
+                if (node.videoMode === 'frame-to-frame' && node.frameInputs && node.frameInputs.length > 0) {
+                    // Get start and end frames from frameInputs
+                    const startFrameInput = node.frameInputs.find(f => f.order === 'start');
+                    const endFrameInput = node.frameInputs.find(f => f.order === 'end');
+
+                    if (startFrameInput) {
+                        const startNode = nodes.find(n => n.id === startFrameInput.nodeId);
+                        if (startNode?.resultUrl) {
+                            imageBase64 = startNode.resultUrl;
+                        }
+                    }
+
+                    if (endFrameInput) {
+                        const endNode = nodes.find(n => n.id === endFrameInput.nodeId);
+                        if (endNode?.resultUrl) {
+                            lastFrameBase64 = endNode.resultUrl;
+                        }
+                    }
+                } else if (node.parentIds && node.parentIds.length > 0) {
+                    // Standard mode: get first parent image
                     const parent = nodes.find(n => n.id === node.parentIds![0]);
 
                     if (parent?.type === NodeType.VIDEO && parent.lastFrame) {
@@ -105,6 +127,7 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
                 const resultUrl = await generateVideo({
                     prompt: node.prompt,
                     imageBase64,
+                    lastFrameBase64,
                     aspectRatio: node.aspectRatio,
                     resolution: node.resolution
                 });

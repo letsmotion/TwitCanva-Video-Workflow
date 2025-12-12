@@ -3,10 +3,11 @@
  * 
  * Control panel for canvas nodes.
  * Handles prompt input, model selection, size/ratio settings, and generation button.
+ * For Video nodes: includes Advanced Settings for frame-to-frame mode.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Sparkles, Banana, Settings2, Check } from 'lucide-react';
+import { Sparkles, Banana, Settings2, Check, ChevronDown, ChevronUp, GripVertical, Image as ImageIcon, Film } from 'lucide-react';
 import { NodeData, NodeStatus, NodeType } from '../../types';
 
 interface NodeControlsProps {
@@ -14,6 +15,7 @@ interface NodeControlsProps {
     inputUrl?: string;
     isLoading: boolean;
     isSuccess: boolean;
+    connectedImageNodes?: { id: string; url: string }[]; // Connected image nodes for frame-to-frame
     onUpdate: (id: string, updates: Partial<NodeData>) => void;
     onGenerate: (id: string) => void;
     onSelect: (id: string) => void;
@@ -32,12 +34,14 @@ export const NodeControls: React.FC<NodeControlsProps> = ({
     inputUrl,
     isLoading,
     isSuccess,
+    connectedImageNodes = [],
     onUpdate,
     onGenerate,
     onSelect
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [showSizeDropdown, setShowSizeDropdown] = useState(false);
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -59,11 +63,48 @@ export const NodeControls: React.FC<NodeControlsProps> = ({
         setShowSizeDropdown(false);
     };
 
+    const handleVideoModeChange = (mode: 'standard' | 'frame-to-frame') => {
+        if (mode === 'frame-to-frame') {
+            // Initialize frameInputs from connected nodes
+            const initialFrameInputs = connectedImageNodes.slice(0, 2).map((node, idx) => ({
+                nodeId: node.id,
+                order: idx === 0 ? 'start' : 'end' as 'start' | 'end'
+            }));
+            onUpdate(data.id, { videoMode: mode, frameInputs: initialFrameInputs });
+        } else {
+            onUpdate(data.id, { videoMode: mode, frameInputs: undefined });
+        }
+    };
+
+    const handleFrameReorder = (fromIndex: number, toIndex: number) => {
+        if (!data.frameInputs || fromIndex === toIndex) return;
+
+        const newFrameInputs = [...data.frameInputs];
+        const [moved] = newFrameInputs.splice(fromIndex, 1);
+        newFrameInputs.splice(toIndex, 0, moved);
+
+        // Update orders based on new positions
+        const updatedFrameInputs = newFrameInputs.map((input, idx) => ({
+            ...input,
+            order: idx === 0 ? 'start' : 'end' as 'start' | 'end'
+        }));
+
+        onUpdate(data.id, { frameInputs: updatedFrameInputs });
+    };
+
     const currentSizeLabel = data.type === NodeType.VIDEO
         ? (data.resolution || "Auto")
         : (data.aspectRatio || "Auto");
 
     const sizeOptions = data.type === NodeType.VIDEO ? VIDEO_RESOLUTIONS : IMAGE_RATIOS;
+    const isVideoNode = data.type === NodeType.VIDEO;
+    const hasConnectedImages = connectedImageNodes.length > 0;
+
+    // Get frame inputs with their image URLs
+    const frameInputsWithUrls = (data.frameInputs || []).map(input => {
+        const node = connectedImageNodes.find(n => n.id === input.nodeId);
+        return { ...input, url: node?.url };
+    }).filter(input => input.url);
 
     return (
         <div
@@ -149,13 +190,112 @@ export const NodeControls: React.FC<NodeControlsProps> = ({
             </div>
 
             {/* Advanced Settings Drawer */}
-            <div
-                className="mt-2 pt-2 border-t border-neutral-800"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-            >
-                <div className="flex items-center justify-center cursor-pointer">
-                    <span className="text-[10px] text-neutral-600 uppercase tracking-widest hover:text-neutral-400">Advanced Settings</span>
-                </div>
+            <div className="mt-2 pt-2 border-t border-neutral-800">
+                <button
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="w-full flex items-center justify-center gap-1 cursor-pointer"
+                >
+                    <span className="text-[10px] text-neutral-600 uppercase tracking-widest hover:text-neutral-400">
+                        Advanced Settings
+                    </span>
+                    {showAdvanced ? (
+                        <ChevronUp size={12} className="text-neutral-600" />
+                    ) : (
+                        <ChevronDown size={12} className="text-neutral-600" />
+                    )}
+                </button>
+
+                {/* Advanced Settings Content - Only for Video nodes */}
+                {showAdvanced && isVideoNode && (
+                    <div className="mt-3 space-y-3">
+                        {/* Video Mode Toggle */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] text-neutral-500 uppercase tracking-wider">Video Mode</label>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => handleVideoModeChange('standard')}
+                                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${data.videoMode !== 'frame-to-frame'
+                                            ? 'bg-blue-600 text-white'
+                                            : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                                        }`}
+                                >
+                                    <Film size={12} />
+                                    Standard
+                                </button>
+                                <button
+                                    onClick={() => handleVideoModeChange('frame-to-frame')}
+                                    disabled={!hasConnectedImages}
+                                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${data.videoMode === 'frame-to-frame'
+                                            ? 'bg-cyan-600 text-white'
+                                            : hasConnectedImages
+                                                ? 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                                                : 'bg-neutral-800/50 text-neutral-600 cursor-not-allowed'
+                                        }`}
+                                    title={!hasConnectedImages ? 'Connect image nodes first' : ''}
+                                >
+                                    <ImageIcon size={12} />
+                                    Frame-to-Frame
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Frame Inputs - Only show when frame-to-frame mode is active */}
+                        {data.videoMode === 'frame-to-frame' && (
+                            <div className="space-y-2">
+                                <label className="text-[10px] text-neutral-500 uppercase tracking-wider">
+                                    Connected Frames <span className="text-neutral-600">(drag to reorder)</span>
+                                </label>
+
+                                {frameInputsWithUrls.length === 0 ? (
+                                    <div className="text-xs text-neutral-600 italic py-2">
+                                        Connect image nodes to use as start/end frames
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {frameInputsWithUrls.map((input, index) => (
+                                            <div
+                                                key={input.nodeId}
+                                                draggable
+                                                onDragStart={() => setDraggedIndex(index)}
+                                                onDragOver={(e) => e.preventDefault()}
+                                                onDrop={() => {
+                                                    if (draggedIndex !== null) {
+                                                        handleFrameReorder(draggedIndex, index);
+                                                        setDraggedIndex(null);
+                                                    }
+                                                }}
+                                                onDragEnd={() => setDraggedIndex(null)}
+                                                className={`flex items-center gap-2 p-2 bg-neutral-800 rounded-lg cursor-grab active:cursor-grabbing transition-all ${draggedIndex === index ? 'opacity-50 scale-95' : ''
+                                                    }`}
+                                            >
+                                                <GripVertical size={14} className="text-neutral-600" />
+                                                <img
+                                                    src={input.url}
+                                                    alt={`Frame ${index + 1}`}
+                                                    className="w-12 h-12 object-cover rounded"
+                                                />
+                                                <div className="flex-1">
+                                                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${input.order === 'start'
+                                                            ? 'bg-green-600/30 text-green-400'
+                                                            : 'bg-orange-600/30 text-orange-400'
+                                                        }`}>
+                                                        {input.order === 'start' ? 'START' : 'END'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {connectedImageNodes.length > frameInputsWithUrls.length && (
+                                    <div className="text-xs text-neutral-500 mt-1">
+                                        {connectedImageNodes.length - frameInputsWithUrls.length} more connected image(s) available
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

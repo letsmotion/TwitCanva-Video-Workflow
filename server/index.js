@@ -226,7 +226,7 @@ app.post('/api/generate-image', async (req, res) => {
 
 app.post('/api/generate-video', async (req, res) => {
     try {
-        const { prompt, imageBase64, aspectRatio, resolution } = req.body;
+        const { prompt, imageBase64, lastFrameBase64, aspectRatio, resolution } = req.body;
 
         if (!API_KEY) {
             return res.status(500).json({ error: "Server missing API Key config" });
@@ -245,6 +245,23 @@ app.post('/api/generate-video', async (req, res) => {
             resolution: apiResolution,
             aspectRatio: apiAspectRatio
         };
+
+        // Add last_frame for frame-to-frame interpolation (Veo 3.1 feature)
+        if (lastFrameBase64) {
+            const lastMatch = lastFrameBase64.match(/^data:(image\/\w+);base64,/);
+            let lastMimeType = lastMatch ? lastMatch[1] : 'image/jpeg';
+            const lastBase64Clean = lastFrameBase64.replace(/^data:image\/\w+;base64,/, "");
+
+            if (lastMimeType === 'image/png' || lastMimeType === 'image/webp') {
+                lastMimeType = 'image/jpeg';
+            }
+
+            videoConfig.lastFrame = {
+                imageBytes: lastBase64Clean,
+                mimeType: lastMimeType
+            };
+            console.log(`Video Gen: Using last_frame with mimeType: ${lastMimeType}, base64 length: ${lastBase64Clean.length}`);
+        }
 
         const args = {
             model: model,

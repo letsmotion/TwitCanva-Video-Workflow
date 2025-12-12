@@ -14,6 +14,7 @@ import { NodeControls } from './NodeControls';
 interface CanvasNodeProps {
   data: NodeData;
   inputUrl?: string;
+  connectedImageNodes?: { id: string; url: string }[]; // For frame-to-frame video mode
   onUpdate: (id: string, updates: Partial<NodeData>) => void;
   onGenerate: (id: string) => void;
   onAddNext: (id: string, type: 'left' | 'right') => void;
@@ -36,6 +37,7 @@ interface CanvasNodeProps {
 export const CanvasNode: React.FC<CanvasNodeProps> = ({
   data,
   inputUrl,
+  connectedImageNodes,
   onUpdate,
   onGenerate,
   onAddNext,
@@ -260,6 +262,7 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
             inputUrl={inputUrl}
             isLoading={isLoading}
             isSuccess={isSuccess}
+            connectedImageNodes={connectedImageNodes}
             onUpdate={onUpdate}
             onGenerate={onGenerate}
             onSelect={onSelect}

@@ -33,6 +33,10 @@ export interface NodeData {
   textMode?: 'menu' | 'editing'; // For Text nodes: current mode
   linkedVideoNodeId?: string; // For Text nodes: linked video node for prompt sync
 
+  // Video node specific
+  videoMode?: 'standard' | 'frame-to-frame'; // Video generation mode
+  frameInputs?: { nodeId: string; order: 'start' | 'end' }[]; // For frame-to-frame: connected image nodes
+
   // Settings
   model: string;
   aspectRatio: string;
