@@ -88,7 +88,7 @@ export const TopBar: React.FC<TopBarProps> = ({
         <>
             <div
                 className="fixed top-0 left-0 h-14 flex items-center justify-between px-6 z-50 pointer-events-none transition-all duration-300"
-                style={{ width: isChatOpen ? 'calc(100% - 340px)' : '100%' }}
+                style={{ width: isChatOpen ? 'calc(100% - 400px)' : '100%' }}
             >
                 {/* Left: Logo & Title */}
                 <div className="flex items-center gap-3 pointer-events-auto">

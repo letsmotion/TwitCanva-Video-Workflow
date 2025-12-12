@@ -25,7 +25,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed top-0 right-0 w-[340px] h-full bg-[#1a1a1a] border-l border-neutral-800 flex flex-col z-40 shadow-2xl">
+        <div className="fixed top-0 right-0 w-[400px] h-full bg-[#1a1a1a] border-l border-neutral-800 flex flex-col z-40 shadow-2xl">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800">
                 <div className="flex items-center gap-3">
@@ -73,12 +73,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             {/* Input Area */}
             <div className="p-4 border-t border-neutral-800">
                 <div className="bg-neutral-800 rounded-2xl p-3">
-                    <input
-                        type="text"
+                    <textarea
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         placeholder="Start your journey of inspiration"
-                        className="w-full bg-transparent text-white text-sm placeholder:text-neutral-500 outline-none mb-3"
+                        className="w-full bg-transparent text-white text-sm placeholder:text-neutral-500 outline-none mb-3 resize-none min-h-[24px] max-h-[120px]"
+                        rows={1}
+                        style={{ scrollbarWidth: 'none' }}
+                        onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            const newHeight = Math.min(target.scrollHeight, 120);
+                            target.style.height = newHeight + 'px';
+                            // Enable scrolling when at max height
+                            target.style.overflowY = target.scrollHeight > 120 ? 'auto' : 'hidden';
+                        }}
                     />
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
