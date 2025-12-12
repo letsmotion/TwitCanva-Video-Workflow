@@ -12,9 +12,10 @@ import {
 interface ToolbarProps {
   onAddClick?: (e: React.MouseEvent) => void;
   onWorkflowsClick?: (e: React.MouseEvent) => void;
+  onHistoryClick?: (e: React.MouseEvent) => void;
 }
 
-export const Toolbar: React.FC<ToolbarProps> = ({ onAddClick, onWorkflowsClick }) => {
+export const Toolbar: React.FC<ToolbarProps> = ({ onAddClick, onWorkflowsClick, onHistoryClick }) => {
   return (
     <div className="fixed left-4 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2 p-1 bg-[#1a1a1a] border border-neutral-800 rounded-full shadow-2xl z-50">
       <button
@@ -38,7 +39,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onAddClick, onWorkflowsClick }
         <button className="text-neutral-400 hover:text-white hover:scale-125 transition-all duration-200">
           <MessageSquare size={20} />
         </button>
-        <button className="text-neutral-400 hover:text-white hover:scale-125 transition-all duration-200">
+        <button
+          className="text-neutral-400 hover:text-white hover:scale-125 transition-all duration-200"
+          onClick={onHistoryClick}
+          title="History"
+        >
           <History size={20} />
         </button>
         <div className="relative group">

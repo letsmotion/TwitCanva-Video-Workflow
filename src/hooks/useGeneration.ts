@@ -16,6 +16,25 @@ interface UseGenerationProps {
 
 export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
     // ============================================================================
+    // HELPERS
+    // ============================================================================
+
+    /**
+     * Save generated asset to server for history
+     */
+    const saveAsset = async (type: 'images' | 'videos', data: string, prompt: string) => {
+        try {
+            await fetch(`http://localhost:3001/api/assets/${type}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data, prompt })
+            });
+        } catch (error) {
+            console.error('Failed to save asset to history:', error);
+        }
+    };
+
+    // ============================================================================
     // GENERATION HANDLER
     // ============================================================================
 
@@ -64,6 +83,9 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
                 });
                 updateNode(id, { status: NodeStatus.SUCCESS, resultUrl });
 
+                // Save to history
+                saveAsset('images', resultUrl, node.prompt);
+
             } else if (node.type === NodeType.VIDEO) {
                 // Get first parent image for video generation
                 let imageBase64: string | undefined;
@@ -95,6 +117,9 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
                     resultUrl,
                     lastFrame
                 });
+
+                // Save to history
+                saveAsset('videos', resultUrl, node.prompt);
             }
         } catch (error: any) {
             // Handle errors

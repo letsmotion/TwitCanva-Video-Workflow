@@ -28,6 +28,7 @@ import { useImageEditor } from './hooks/useImageEditor';
 import { extractVideoLastFrame } from './utils/videoHelpers';
 import { SelectionBoundingBox } from './components/canvas/SelectionBoundingBox';
 import { WorkflowPanel } from './components/WorkflowPanel';
+import { HistoryPanel } from './components/HistoryPanel';
 import { ImageEditorModal } from './components/modals/ImageEditorModal';
 
 // ============================================================================
@@ -185,6 +186,46 @@ export default function App() {
     handleCloseImageEditor,
     handleUpload
   } = useImageEditor({ nodes, updateNode });
+
+  // History panel state
+  const [isHistoryPanelOpen, setIsHistoryPanelOpen] = useState(false);
+  const [historyPanelY, setHistoryPanelY] = useState(0);
+
+  const handleHistoryClick = (e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setHistoryPanelY(rect.top);
+    setIsHistoryPanelOpen(prev => !prev);
+  };
+
+  const closeHistoryPanel = () => {
+    setIsHistoryPanelOpen(false);
+  };
+
+  /**
+   * Handle selecting an asset from history - creates new node with the image/video
+   */
+  const handleSelectAsset = (type: 'images' | 'videos', url: string, prompt: string) => {
+    // Calculate position at center of canvas
+    const centerX = (window.innerWidth / 2 - viewport.x) / viewport.zoom - 170;
+    const centerY = (window.innerHeight / 2 - viewport.y) / viewport.zoom - 150;
+
+    // Create new node with the selected asset
+    const newNode: NodeData = {
+      id: Date.now().toString(),
+      type: type === 'images' ? NodeType.IMAGE : NodeType.VIDEO,
+      x: centerX,
+      y: centerY,
+      prompt: prompt,
+      status: NodeStatus.SUCCESS,
+      resultUrl: url,
+      model: 'imagen-3.0-generate-002',
+      aspectRatio: '1:1',
+      resolution: '1024x1024'
+    };
+
+    setNodes(prev => [...prev, newNode]);
+    closeHistoryPanel();
+  };
 
   // ============================================================================
   // EFFECTS
@@ -352,6 +393,7 @@ export default function App() {
         setSelectedConnection(null);
         setContextMenu(prev => ({ ...prev, isOpen: false }));
         closeWorkflowPanel();
+        closeHistoryPanel();
       }
       // Middle-click (button 1) or other: Start panning
       else {
@@ -560,6 +602,7 @@ export default function App() {
       <Toolbar
         onAddClick={handleToolbarAdd}
         onWorkflowsClick={handleWorkflowsClick}
+        onHistoryClick={handleHistoryClick}
       />
 
       {/* Workflow Panel */}
@@ -571,6 +614,13 @@ export default function App() {
         panelY={workflowPanelY}
       />
 
+      {/* History Panel */}
+      <HistoryPanel
+        isOpen={isHistoryPanelOpen}
+        onClose={closeHistoryPanel}
+        onSelectAsset={handleSelectAsset}
+        panelY={historyPanelY}
+      />
 
       {/* Top Bar */}
       <TopBar

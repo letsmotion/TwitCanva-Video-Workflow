@@ -14,11 +14,20 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3001;
 
-// Ensure assets/workflows directory exists
+// Ensure assets directories exist
 const WORKFLOWS_DIR = path.join(__dirname, '..', 'assets', 'workflows');
-if (!fs.existsSync(WORKFLOWS_DIR)) {
-    fs.mkdirSync(WORKFLOWS_DIR, { recursive: true });
-}
+const IMAGES_DIR = path.join(__dirname, '..', 'assets', 'images');
+const VIDEOS_DIR = path.join(__dirname, '..', 'assets', 'videos');
+
+[WORKFLOWS_DIR, IMAGES_DIR, VIDEOS_DIR].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+});
+
+// Serve static assets
+app.use('/assets/images', express.static(IMAGES_DIR));
+app.use('/assets/videos', express.static(VIDEOS_DIR));
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -251,6 +260,112 @@ app.post('/api/generate-video', async (req, res) => {
     } catch (error) {
         console.error("Server Video Gen Error:", error);
         res.status(500).json({ error: error.message || "Video generation failed" });
+    }
+});
+
+// ============================================================================
+// ASSET HISTORY API
+// ============================================================================
+
+// Save an asset (image or video)
+app.post('/api/assets/:type', async (req, res) => {
+    try {
+        const { type } = req.params;
+        const { data, prompt } = req.body;
+
+        if (!['images', 'videos'].includes(type)) {
+            return res.status(400).json({ error: 'Invalid asset type' });
+        }
+
+        const targetDir = type === 'images' ? IMAGES_DIR : VIDEOS_DIR;
+        const id = Date.now().toString();
+        const ext = type === 'images' ? 'png' : 'mp4';
+        const filename = `${id}.${ext}`;
+        const metaFilename = `${id}.json`;
+
+        // Save the asset file
+        const base64Data = data.replace(/^data:[^;]+;base64,/, '');
+        fs.writeFileSync(path.join(targetDir, filename), base64Data, 'base64');
+
+        // Save metadata
+        const metadata = {
+            id,
+            filename,
+            prompt: prompt || '',
+            createdAt: new Date().toISOString(),
+            type
+        };
+        fs.writeFileSync(path.join(targetDir, metaFilename), JSON.stringify(metadata, null, 2));
+
+        res.json({ success: true, id, filename, url: `/assets/${type}/${filename}` });
+    } catch (error) {
+        console.error('Save asset error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// List all assets of a type
+app.get('/api/assets/:type', async (req, res) => {
+    try {
+        const { type } = req.params;
+
+        if (!['images', 'videos'].includes(type)) {
+            return res.status(400).json({ error: 'Invalid asset type' });
+        }
+
+        const targetDir = type === 'images' ? IMAGES_DIR : VIDEOS_DIR;
+
+        if (!fs.existsSync(targetDir)) {
+            return res.json([]);
+        }
+
+        const files = fs.readdirSync(targetDir);
+        const assets = [];
+
+        for (const file of files) {
+            if (file.endsWith('.json')) {
+                try {
+                    const content = fs.readFileSync(path.join(targetDir, file), 'utf8');
+                    const metadata = JSON.parse(content);
+                    metadata.url = `/assets/${type}/${metadata.filename}`;
+                    assets.push(metadata);
+                } catch (e) {
+                    // Skip invalid JSON files
+                }
+            }
+        }
+
+        // Sort by createdAt descending (newest first)
+        assets.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        res.json(assets);
+    } catch (error) {
+        console.error('List assets error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Delete an asset
+app.delete('/api/assets/:type/:id', async (req, res) => {
+    try {
+        const { type, id } = req.params;
+
+        if (!['images', 'videos'].includes(type)) {
+            return res.status(400).json({ error: 'Invalid asset type' });
+        }
+
+        const targetDir = type === 'images' ? IMAGES_DIR : VIDEOS_DIR;
+        const ext = type === 'images' ? 'png' : 'mp4';
+        const assetPath = path.join(targetDir, `${id}.${ext}`);
+        const metaPath = path.join(targetDir, `${id}.json`);
+
+        if (fs.existsSync(assetPath)) fs.unlinkSync(assetPath);
+        if (fs.existsSync(metaPath)) fs.unlinkSync(metaPath);
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('Delete asset error:', error);
+        res.status(500).json({ error: error.message });
     }
 });
 
