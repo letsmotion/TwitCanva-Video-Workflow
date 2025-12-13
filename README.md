@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="public/logo.png" alt="TwitCanva Logo" width="120" />
+  <img src="public/logo.svg" alt="TwitCanva Logo" width="120" />
   <h1>TwitCanva</h1>
 </div>
 
