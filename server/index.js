@@ -234,6 +234,46 @@ app.get('/api/library', async (req, res) => {
     }
 });
 
+// Delete library asset
+app.delete('/api/library/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const libraryJsonPath = path.join(LIBRARY_ASSETS_DIR, 'assets.json');
+
+        if (!fs.existsSync(libraryJsonPath)) {
+            return res.status(404).json({ error: "Library not found" });
+        }
+
+        let libraryData = JSON.parse(fs.readFileSync(libraryJsonPath, 'utf8'));
+        const assetIndex = libraryData.findIndex(a => a.id === id);
+
+        if (assetIndex === -1) {
+            return res.status(404).json({ error: "Asset not found" });
+        }
+
+        const asset = libraryData[assetIndex];
+
+        // Delete the actual file if it exists in our assets folder
+        // asset.url usually looks like /library/assets/Category/file.ext
+        if (asset.url && asset.url.startsWith('/library/assets/')) {
+            const relativePath = asset.url.replace('/library/assets/', '');
+            const filePath = path.join(LIBRARY_ASSETS_DIR, relativePath);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        }
+
+        // Remove from array
+        libraryData.splice(assetIndex, 1);
+        fs.writeFileSync(libraryJsonPath, JSON.stringify(libraryData, null, 2));
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Delete library asset error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // --- Workflow API Routes ---
 
 // Save/Update workflow

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Filter } from 'lucide-react';
+import { X, Search, Filter, Trash2 } from 'lucide-react';
 
 interface LibraryAsset {
     id: string;
@@ -58,6 +58,24 @@ export const AssetLibraryPanel: React.FC<AssetLibraryPanelProps> = ({
         }
     };
 
+    const handleDeleteAsset = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent selection
+        // Confirmation is now handled in the UI before this is called
+
+        try {
+            const res = await fetch(`http://localhost:3001/api/library/${id}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                setAssets(prev => prev.filter(a => a.id !== id));
+            } else {
+                console.error("Failed to delete asset");
+            }
+        } catch (error) {
+            console.error("Delete error:", error);
+        }
+    };
+
     if (!isOpen) return null;
 
     if (variant === 'modal') {
@@ -73,13 +91,15 @@ export const AssetLibraryPanel: React.FC<AssetLibraryPanelProps> = ({
                             <X size={20} />
                         </button>
                     </div>
-                    {/* Reuse internal content logic by extracting or just inlining for now since structure differs slightly (modal has header) */}
+                    {/* Reuse internal content logic */}
                     <AssetLibraryContent
                         selectedCategory={selectedCategory}
                         setSelectedCategory={setSelectedCategory}
                         assets={assets}
                         loading={loading}
                         onSelectAsset={onSelectAsset}
+                        onDeleteAsset={handleDeleteAsset}
+                        variant={variant}
                     />
                 </div>
                 {/* Click outside to close */}
@@ -99,6 +119,8 @@ export const AssetLibraryPanel: React.FC<AssetLibraryPanelProps> = ({
                 assets={assets}
                 loading={loading}
                 onSelectAsset={onSelectAsset}
+                onDeleteAsset={handleDeleteAsset}
+                variant={variant}
             />
         </div>
     );
@@ -107,11 +129,28 @@ export const AssetLibraryPanel: React.FC<AssetLibraryPanelProps> = ({
 // Extracted Internal Component for reuse
 const AssetLibraryContent = ({
     selectedCategory, setSelectedCategory,
-    assets, loading, onSelectAsset
+    assets, loading, onSelectAsset, onDeleteAsset, variant
 }: any) => {
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
     const filteredAssets = assets.filter((asset: any) =>
         selectedCategory === 'All' || asset.category === selectedCategory
     );
+
+    const handleDeleteClick = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        setDeleteConfirmId(id);
+    };
+
+    const handleConfirmDelete = (e: React.MouseEvent, id: string) => {
+        onDeleteAsset(id, e);
+        setDeleteConfirmId(null);
+    };
+
+    const handleCancelDelete = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setDeleteConfirmId(null);
+    };
 
     return (
         <>
@@ -134,11 +173,12 @@ const AssetLibraryContent = ({
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 gap-3 pb-4">
+                <div className={`flex-1 overflow-y-auto pr-2 grid gap-3 pb-4 content-start ${variant === 'modal' ? 'grid-cols-4' : 'grid-cols-2'
+                    }`}>
                     {loading ? (
-                        <div className="col-span-2 text-center py-10 text-neutral-500">Loading...</div>
+                        <div className="col-span-full text-center py-10 text-neutral-500">Loading...</div>
                     ) : filteredAssets.length === 0 ? (
-                        <div className="col-span-2 text-center py-10 text-neutral-500 text-sm">
+                        <div className="col-span-full text-center py-10 text-neutral-500 text-sm">
                             No assets found in this category.
                         </div>
                     ) : (
@@ -152,10 +192,45 @@ const AssetLibraryContent = ({
                                     src={asset.url}
                                     alt={asset.name}
                                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                                    onError={(e) => {
+                                        const target = e.target as HTMLImageElement;
+                                        target.onerror = null; // Prevent infinite loop
+                                        target.src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cmVjdCB4PSIzIiB5PSIzIiB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHJ4PSIyIiByeT0iMiI+PC9yZWN0PjxjaXJjbGUgY3g9IjguNSIgY3k9IjguNSIgcj0iMS41Ij48L2NpcmNsZT48cG9seWxpbmUgcG9pbnRzPSIyMSAxNSAxNiAxMCA1IDIxIj48LcG9lyxpbmU+PC9zdmc+';
+                                        target.classList.add('p-8', 'opacity-50');
+                                    }}
                                 />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 pointer-events-none">
                                     <span className="text-white text-xs font-medium truncate">{asset.name}</span>
                                 </div>
+
+                                {/* Delete Button or Confirmation */}
+                                {deleteConfirmId === asset.id ? (
+                                    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2 z-20 animate-in fade-in duration-200" onClick={(e) => e.stopPropagation()}>
+                                        <span className="text-white text-xs font-medium">Delete?</span>
+                                        <div className="flex gap-2">
+                                            <button
+                                                className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-xs rounded transition-colors"
+                                                onClick={(e) => handleConfirmDelete(e, asset.id)}
+                                            >
+                                                Yes
+                                            </button>
+                                            <button
+                                                className="px-2 py-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs rounded transition-colors"
+                                                onClick={handleCancelDelete}
+                                            >
+                                                No
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <button
+                                        className="absolute top-1 right-1 p-1.5 bg-black/60 text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80 z-10"
+                                        onClick={(e) => handleDeleteClick(e, asset.id)}
+                                        title="Delete Asset"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                )}
                             </div>
                         ))
                     )}
