@@ -104,7 +104,21 @@ app.post('/api/workflows', async (req, res) => {
             workflow.createdAt = workflow.updatedAt;
         }
 
+
         const filePath = path.join(WORKFLOWS_DIR, `${workflow.id}.json`);
+
+        // Preserve existing coverUrl if it exists
+        if (fs.existsSync(filePath)) {
+            try {
+                const existingData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                if (existingData.coverUrl) {
+                    workflow.coverUrl = existingData.coverUrl;
+                }
+            } catch (readError) {
+                console.warn("Could not read existing workflow to preserve cover:", readError);
+            }
+        }
+
         fs.writeFileSync(filePath, JSON.stringify(workflow, null, 2));
 
         res.json({ success: true, id: workflow.id });
@@ -249,6 +263,18 @@ app.post('/api/generate-image', async (req, res) => {
 
                     // Return URL to the saved file
                     const imageUrl = `/assets/images/${imageId}.png`;
+
+                    // SAVE METADATA (Required for History)
+                    const metadata = {
+                        id: imageId,
+                        filename: `${imageId}.png`,
+                        prompt: prompt,
+                        createdAt: new Date().toISOString(),
+                        type: 'images'
+                    };
+                    const metaPath = path.join(IMAGES_DIR, `${imageId}.json`);
+                    fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2));
+
                     console.log(`Image saved: ${imageUrl}`);
                     return res.json({ resultUrl: imageUrl });
                 }
@@ -358,6 +384,18 @@ app.post('/api/generate-video', async (req, res) => {
 
         // Return URL to the saved file
         const videoUrl = `/assets/videos/${videoId}.mp4`;
+
+        // SAVE METADATA (Required for History)
+        const metadata = {
+            id: videoId,
+            filename: `${videoId}.mp4`,
+            prompt: prompt || "A cinematic video",
+            createdAt: new Date().toISOString(),
+            type: 'videos'
+        };
+        const metaPath = path.join(VIDEOS_DIR, `${videoId}.json`);
+        fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 2));
+
         console.log(`Video saved: ${videoUrl}`);
         return res.json({ resultUrl: videoUrl });
 
