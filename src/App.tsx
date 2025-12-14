@@ -598,7 +598,7 @@ export default function App() {
         isOpen: true,
         x: e.clientX,
         y: e.clientY,
-        type: 'global'
+        type: 'add-nodes'
       });
     }
   };

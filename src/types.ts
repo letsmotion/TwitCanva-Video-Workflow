@@ -47,7 +47,7 @@ export interface ContextMenuState {
   isOpen: boolean;
   x: number;
   y: number;
-  type: 'global' | 'node-connector' | 'node-options'; // 'global' = double click on canvas, 'node-connector' = clicking + on a node, 'node-options' = right click
+  type: 'global' | 'node-connector' | 'node-options' | 'add-nodes'; // 'global' = right click on canvas, 'add-nodes' = double click
   sourceNodeId?: string; // If 'node-connector' or 'node-options', which node originated the click
   connectorSide?: 'left' | 'right';
 }

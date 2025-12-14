@@ -229,12 +229,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           label={isConnector ? "Video Generation" : "Video"}
           onClick={() => onSelectType(NodeType.VIDEO)}
         />
-        <MenuItem
-          icon={<Music size={18} />}
-          label="Audio"
-          badge="Beta"
-          onClick={() => onSelectType(NodeType.AUDIO)}
-        />
+
 
         {!isConnector && (
           <MenuItem
@@ -244,12 +239,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
           />
         )}
 
-        <MenuItem
-          icon={<Layout size={18} />}
-          label={isConnector ? "Storyboard" : "Storyboard Manager"}
-          badge="Beta"
-          onClick={() => onSelectType(NodeType.STORYBOARD)}
-        />
+
       </div>
     </div>
   );
