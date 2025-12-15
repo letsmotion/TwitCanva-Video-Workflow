@@ -30,25 +30,30 @@ const VIDEO_RESOLUTIONS = [
 ];
 
 // Video model versions with metadata
+// supportsTextToVideo: Can generate video from text prompt only
+// supportsImageToVideo: Can use a single input image (start frame)
+// supportsMultiImage: Can use multiple input images (frame-to-frame)
 const VIDEO_MODELS = [
-    { id: 'veo-3.1', name: 'Veo 3.1', provider: 'google', supportsMultiImage: true },
-    { id: 'kling-v1', name: 'Kling V1', provider: 'kling', supportsMultiImage: false },
-    { id: 'kling-v1-5', name: 'Kling V1.5', provider: 'kling', supportsMultiImage: false },
-    { id: 'kling-v1-6', name: 'Kling V1.6', provider: 'kling', supportsMultiImage: true },
-    { id: 'kling-v2-master', name: 'Kling V2 Master', provider: 'kling', supportsMultiImage: false },
-    { id: 'kling-v2-1', name: 'Kling V2.1', provider: 'kling', supportsMultiImage: false, recommended: true },
-    { id: 'kling-v2-1-master', name: 'Kling V2.1 Master', provider: 'kling', supportsMultiImage: false },
-    { id: 'kling-v2-5-turbo', name: 'Kling V2.5 Turbo', provider: 'kling', supportsMultiImage: false },
+    { id: 'veo-3.1', name: 'Veo 3.1', provider: 'google', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: true },
+    { id: 'kling-v1', name: 'Kling V1', provider: 'kling', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: false },
+    { id: 'kling-v1-5', name: 'Kling V1.5', provider: 'kling', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: false },
+    { id: 'kling-v1-6', name: 'Kling V1.6', provider: 'kling', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: true },
+    { id: 'kling-v2-master', name: 'Kling V2 Master', provider: 'kling', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: false },
+    { id: 'kling-v2-1', name: 'Kling V2.1', provider: 'kling', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: false, recommended: true },
+    { id: 'kling-v2-1-master', name: 'Kling V2.1 Master', provider: 'kling', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: false },
+    { id: 'kling-v2-5-turbo', name: 'Kling V2.5 Turbo', provider: 'kling', supportsTextToVideo: true, supportsImageToVideo: true, supportsMultiImage: false },
 ];
 
 // Image model versions with metadata
+// supportsImageToImage: Can use a single reference image
+// supportsMultiImage: Can use multiple reference images (2-4)
 const IMAGE_MODELS = [
-    { id: 'gemini-pro', name: 'Nano Banana Pro', provider: 'google' },
-    { id: 'kling-v1', name: 'Kling V1', provider: 'kling' },
-    { id: 'kling-v1-5', name: 'Kling V1.5', provider: 'kling' },
-    { id: 'kling-v2', name: 'Kling V2', provider: 'kling' },
-    { id: 'kling-v2-new', name: 'Kling V2 New', provider: 'kling' },
-    { id: 'kling-v2-1', name: 'Kling V2.1', provider: 'kling', recommended: true },
+    { id: 'gemini-pro', name: 'Nano Banana Pro', provider: 'google', supportsImageToImage: true, supportsMultiImage: true },
+    { id: 'kling-v1', name: 'Kling V1', provider: 'kling', supportsImageToImage: true, supportsMultiImage: false },
+    { id: 'kling-v1-5', name: 'Kling V1.5', provider: 'kling', supportsImageToImage: true, supportsMultiImage: false },
+    { id: 'kling-v2', name: 'Kling V2', provider: 'kling', supportsImageToImage: true, supportsMultiImage: true },
+    { id: 'kling-v2-new', name: 'Kling V2 New', provider: 'kling', supportsImageToImage: true, supportsMultiImage: false },
+    { id: 'kling-v2-1', name: 'Kling V2.1', provider: 'kling', supportsImageToImage: false, supportsMultiImage: true, recommended: true },
 ];
 
 const NodeControlsComponent: React.FC<NodeControlsProps> = ({
@@ -101,6 +106,13 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
         };
     }, []);
 
+    // Auto-open Advanced Settings when 2+ images are connected to a video node
+    useEffect(() => {
+        if (data.type === NodeType.VIDEO && connectedImageNodes.length >= 2) {
+            setShowAdvanced(true);
+        }
+    }, [data.type, connectedImageNodes.length]);
+
     // Handle prompt change with debounce
     const handlePromptChange = (value: string) => {
         setLocalPrompt(value); // Update local state immediately for responsive typing
@@ -138,17 +150,21 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
     };
 
     const handleFrameReorder = (fromIndex: number, toIndex: number) => {
-        if (!data.frameInputs || fromIndex === toIndex) return;
+        if (fromIndex === toIndex || connectedImageNodes.length < 2) return;
 
-        const newFrameInputs = [...data.frameInputs];
-        const [moved] = newFrameInputs.splice(fromIndex, 1);
-        newFrameInputs.splice(toIndex, 0, moved);
+        // Get the two connected nodes
+        const node1 = connectedImageNodes[0];
+        const node2 = connectedImageNodes[1];
 
-        // Update orders based on new positions
-        const updatedFrameInputs = newFrameInputs.map((input, idx) => ({
-            ...input,
-            order: idx === 0 ? 'start' : 'end' as 'start' | 'end'
-        }));
+        // Get current orders (from saved data or default)
+        const current1Order = data.frameInputs?.find(f => f.nodeId === node1.id)?.order || 'start';
+        const current2Order = data.frameInputs?.find(f => f.nodeId === node2.id)?.order || 'end';
+
+        // Swap the orders
+        const updatedFrameInputs = [
+            { nodeId: node1.id, order: current1Order === 'start' ? 'end' : 'start' as 'start' | 'end' },
+            { nodeId: node2.id, order: current2Order === 'start' ? 'end' : 'start' as 'start' | 'end' }
+        ];
 
         onUpdate(data.id, { frameInputs: updatedFrameInputs });
     };
@@ -165,10 +181,29 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
     const currentVideoModel = VIDEO_MODELS.find(m => m.id === data.videoModel) || VIDEO_MODELS[0];
     const isFrameToFrame = data.videoMode === 'frame-to-frame';
 
-    // Filter models based on mode - only show multi-image capable models for frame-to-frame
-    const availableVideoModels = isFrameToFrame
-        ? VIDEO_MODELS.filter(m => m.supportsMultiImage)
-        : VIDEO_MODELS;
+    // Determine video generation mode based on inputs and settings
+    // If 2+ images connected, treat as multi-image even if not explicitly in frame-to-frame mode
+    const videoInputCount = connectedImageNodes.length;
+    const videoGenerationMode = (isFrameToFrame || videoInputCount >= 2) ? 'frame-to-frame'
+        : (inputUrl || videoInputCount > 0) ? 'image-to-video'
+            : 'text-to-video';
+
+    // Filter video models based on mode
+    const availableVideoModels = VIDEO_MODELS.filter(model => {
+        if (videoGenerationMode === 'text-to-video') return model.supportsTextToVideo;
+        if (videoGenerationMode === 'image-to-video') return model.supportsImageToVideo;
+        return model.supportsMultiImage; // frame-to-frame / multi-image
+    });
+
+    // Auto-select first available video model when current is no longer valid
+    useEffect(() => {
+        if (data.type !== NodeType.VIDEO) return;
+
+        const isCurrentModelAvailable = availableVideoModels.some(m => m.id === data.videoModel);
+        if (!isCurrentModelAvailable && availableVideoModels.length > 0) {
+            onUpdate(data.id, { videoModel: availableVideoModels[0].id });
+        }
+    }, [videoGenerationMode, data.videoModel, data.type, data.id, availableVideoModels, onUpdate]);
 
     const handleVideoModelChange = (modelId: string) => {
         onUpdate(data.id, { videoModel: modelId });
@@ -178,16 +213,53 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
     // Image model selection logic
     const currentImageModel = IMAGE_MODELS.find(m => m.id === data.imageModel) || IMAGE_MODELS[0];
 
+    // Filter image models based on connected inputs
+    // 0 inputs = all models, 1 input = needs supportsImageToImage, 2+ inputs = needs supportsMultiImage
+    const inputCount = connectedImageNodes.length;
+    const availableImageModels = IMAGE_MODELS.filter(model => {
+        if (inputCount === 0) return true; // Text-to-image: all models work
+        if (inputCount === 1) return model.supportsImageToImage; // Single ref: filter out V2.1
+        return model.supportsMultiImage; // Multi-ref: filter out V1, V1.5, V2 New
+    });
+
+    // Auto-select first available model when current model is no longer valid for the mode
+    useEffect(() => {
+        if (data.type !== NodeType.IMAGE && data.type !== NodeType.IMAGE_EDITOR) return;
+
+        const isCurrentModelAvailable = availableImageModels.some(m => m.id === data.imageModel);
+        if (!isCurrentModelAvailable && availableImageModels.length > 0) {
+            // Auto-select first available model
+            onUpdate(data.id, { imageModel: availableImageModels[0].id });
+        }
+    }, [inputCount, data.imageModel, data.type, data.id, availableImageModels, onUpdate]);
+
+    // Determine current generation mode for display
+    const imageGenerationMode = inputCount === 0 ? 'text-to-image'
+        : inputCount === 1 ? 'image-to-image'
+            : 'multi-image';
+
     const handleImageModelChange = (modelId: string) => {
         onUpdate(data.id, { imageModel: modelId });
         setShowModelDropdown(false);
     };
 
     // Get frame inputs with their image URLs
-    const frameInputsWithUrls = (data.frameInputs || []).map(input => {
-        const node = connectedImageNodes.find(n => n.id === input.nodeId);
-        return { ...input, url: node?.url };
-    }).filter(input => input.url);
+    // Auto-assign order: first connected = start, second = end
+    // If user has explicitly set frameInputs, use those orders, otherwise auto-assign
+    const frameInputsWithUrls = connectedImageNodes.slice(0, 2).map((node, idx) => {
+        // Check if there's an explicit order from user reordering
+        const existingInput = data.frameInputs?.find(f => f.nodeId === node.id);
+        return {
+            nodeId: node.id,
+            url: node.url,
+            order: existingInput?.order || (idx === 0 ? 'start' : 'end') as 'start' | 'end'
+        };
+    }).sort((a, b) => {
+        // Sort by order: 'start' first, 'end' second
+        if (a.order === 'start' && b.order === 'end') return -1;
+        if (a.order === 'end' && b.order === 'start') return 1;
+        return 0;
+    });
 
     return (
         <div
@@ -241,47 +313,64 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
 
                             {/* Model Dropdown Menu */}
                             {showModelDropdown && (
-                                <div className="absolute top-full mt-1 left-0 w-48 bg-[#252525] border border-neutral-700 rounded-lg shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100">
-                                    {/* Google Models */}
-                                    <div className="px-3 py-1.5 text-[10px] font-bold text-neutral-500 uppercase tracking-wider bg-[#1f1f1f]">
-                                        Google
+                                <div className="absolute top-full mt-1 left-0 w-52 bg-[#252525] border border-neutral-700 rounded-lg shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100">
+                                    {/* Mode indicator */}
+                                    <div className="px-3 py-1.5 text-[10px] font-bold text-neutral-400 uppercase tracking-wider bg-[#1a1a1a] border-b border-neutral-700 flex items-center gap-1.5">
+                                        <span className={`w-1.5 h-1.5 rounded-full ${videoGenerationMode === 'text-to-video' ? 'bg-blue-400' :
+                                            videoGenerationMode === 'image-to-video' ? 'bg-green-400' : 'bg-purple-400'
+                                            }`} />
+                                        {videoGenerationMode === 'text-to-video' ? 'Text → Video' :
+                                            videoGenerationMode === 'image-to-video' ? 'Image → Video' :
+                                                'Frame-to-Frame'}
                                     </div>
-                                    {availableVideoModels.filter(m => m.provider === 'google').map(model => (
-                                        <button
-                                            key={model.id}
-                                            onClick={() => handleVideoModelChange(model.id)}
-                                            className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[#333] transition-colors ${currentVideoModel.id === model.id ? 'text-blue-400' : 'text-neutral-300'
-                                                }`}
-                                        >
-                                            <span className="flex items-center gap-2">
-                                                <Film size={12} className="text-cyan-400" />
-                                                {model.name}
-                                            </span>
-                                            {currentVideoModel.id === model.id && <Check size={12} />}
-                                        </button>
-                                    ))}
+                                    {/* Google Models */}
+                                    {availableVideoModels.filter(m => m.provider === 'google').length > 0 && (
+                                        <>
+                                            <div className="px-3 py-1.5 text-[10px] font-bold text-neutral-500 uppercase tracking-wider bg-[#1f1f1f]">
+                                                Google
+                                            </div>
+                                            {availableVideoModels.filter(m => m.provider === 'google').map(model => (
+                                                <button
+                                                    key={model.id}
+                                                    onClick={() => handleVideoModelChange(model.id)}
+                                                    className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[#333] transition-colors ${currentVideoModel.id === model.id ? 'text-blue-400' : 'text-neutral-300'
+                                                        }`}
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <Film size={12} className="text-cyan-400" />
+                                                        {model.name}
+                                                    </span>
+                                                    {currentVideoModel.id === model.id && <Check size={12} />}
+                                                </button>
+                                            ))}
+                                        </>
+                                    )}
 
                                     {/* Kling Models */}
-                                    <div className="px-3 py-1.5 text-[10px] font-bold text-neutral-500 uppercase tracking-wider bg-[#1f1f1f] border-t border-neutral-700">
-                                        Kling AI
-                                    </div>
-                                    {availableVideoModels.filter(m => m.provider === 'kling').map(model => (
-                                        <button
-                                            key={model.id}
-                                            onClick={() => handleVideoModelChange(model.id)}
-                                            className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[#333] transition-colors ${currentVideoModel.id === model.id ? 'text-blue-400' : 'text-neutral-300'
-                                                }`}
-                                        >
-                                            <span className="flex items-center gap-2">
-                                                <Film size={12} className="text-cyan-400" />
-                                                {model.name}
-                                                {(model as any).recommended && (
-                                                    <span className="text-[9px] px-1 py-0.5 bg-green-600/30 text-green-400 rounded">REC</span>
-                                                )}
-                                            </span>
-                                            {currentVideoModel.id === model.id && <Check size={12} />}
-                                        </button>
-                                    ))}
+                                    {availableVideoModels.filter(m => m.provider === 'kling').length > 0 && (
+                                        <>
+                                            <div className="px-3 py-1.5 text-[10px] font-bold text-neutral-500 uppercase tracking-wider bg-[#1f1f1f] border-t border-neutral-700">
+                                                Kling AI
+                                            </div>
+                                            {availableVideoModels.filter(m => m.provider === 'kling').map(model => (
+                                                <button
+                                                    key={model.id}
+                                                    onClick={() => handleVideoModelChange(model.id)}
+                                                    className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[#333] transition-colors ${currentVideoModel.id === model.id ? 'text-blue-400' : 'text-neutral-300'
+                                                        }`}
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <Film size={12} className="text-cyan-400" />
+                                                        {model.name}
+                                                        {model.recommended && (
+                                                            <span className="text-[9px] px-1 py-0.5 bg-green-600/30 text-green-400 rounded">REC</span>
+                                                        )}
+                                                    </span>
+                                                    {currentVideoModel.id === model.id && <Check size={12} />}
+                                                </button>
+                                            ))}
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -302,47 +391,64 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
 
                             {/* Image Model Dropdown Menu */}
                             {showModelDropdown && (
-                                <div className="absolute top-full mt-1 left-0 w-44 bg-[#252525] border border-neutral-700 rounded-lg shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100">
-                                    {/* Google Models */}
-                                    <div className="px-3 py-1.5 text-[10px] font-bold text-neutral-500 uppercase tracking-wider bg-[#1f1f1f]">
-                                        Google
+                                <div className="absolute top-full mt-1 left-0 w-48 bg-[#252525] border border-neutral-700 rounded-lg shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100">
+                                    {/* Mode indicator */}
+                                    <div className="px-3 py-1.5 text-[10px] font-bold text-neutral-400 uppercase tracking-wider bg-[#1a1a1a] border-b border-neutral-700 flex items-center gap-1.5">
+                                        <span className={`w-1.5 h-1.5 rounded-full ${imageGenerationMode === 'text-to-image' ? 'bg-blue-400' :
+                                            imageGenerationMode === 'image-to-image' ? 'bg-green-400' : 'bg-purple-400'
+                                            }`} />
+                                        {imageGenerationMode === 'text-to-image' ? 'Text → Image' :
+                                            imageGenerationMode === 'image-to-image' ? `Image → Image` :
+                                                `${inputCount} Images → Image`}
                                     </div>
-                                    {IMAGE_MODELS.filter(m => m.provider === 'google').map(model => (
-                                        <button
-                                            key={model.id}
-                                            onClick={() => handleImageModelChange(model.id)}
-                                            className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[#333] transition-colors ${currentImageModel.id === model.id ? 'text-blue-400' : 'text-neutral-300'
-                                                }`}
-                                        >
-                                            <span className="flex items-center gap-2">
-                                                <Banana size={12} className="text-yellow-400" />
-                                                {model.name}
-                                            </span>
-                                            {currentImageModel.id === model.id && <Check size={12} />}
-                                        </button>
-                                    ))}
+                                    {/* Google Models */}
+                                    {availableImageModels.filter(m => m.provider === 'google').length > 0 && (
+                                        <>
+                                            <div className="px-3 py-1.5 text-[10px] font-bold text-neutral-500 uppercase tracking-wider bg-[#1f1f1f]">
+                                                Google
+                                            </div>
+                                            {availableImageModels.filter(m => m.provider === 'google').map(model => (
+                                                <button
+                                                    key={model.id}
+                                                    onClick={() => handleImageModelChange(model.id)}
+                                                    className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[#333] transition-colors ${currentImageModel.id === model.id ? 'text-blue-400' : 'text-neutral-300'
+                                                        }`}
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <Banana size={12} className="text-yellow-400" />
+                                                        {model.name}
+                                                    </span>
+                                                    {currentImageModel.id === model.id && <Check size={12} />}
+                                                </button>
+                                            ))}
+                                        </>
+                                    )}
 
                                     {/* Kling Models */}
-                                    <div className="px-3 py-1.5 text-[10px] font-bold text-neutral-500 uppercase tracking-wider bg-[#1f1f1f] border-t border-neutral-700">
-                                        Kling AI
-                                    </div>
-                                    {IMAGE_MODELS.filter(m => m.provider === 'kling').map(model => (
-                                        <button
-                                            key={model.id}
-                                            onClick={() => handleImageModelChange(model.id)}
-                                            className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[#333] transition-colors ${currentImageModel.id === model.id ? 'text-blue-400' : 'text-neutral-300'
-                                                }`}
-                                        >
-                                            <span className="flex items-center gap-2">
-                                                <ImageIcon size={12} className="text-cyan-400" />
-                                                {model.name}
-                                                {(model as any).recommended && (
-                                                    <span className="text-[9px] px-1 py-0.5 bg-green-600/30 text-green-400 rounded">REC</span>
-                                                )}
-                                            </span>
-                                            {currentImageModel.id === model.id && <Check size={12} />}
-                                        </button>
-                                    ))}
+                                    {availableImageModels.filter(m => m.provider === 'kling').length > 0 && (
+                                        <>
+                                            <div className="px-3 py-1.5 text-[10px] font-bold text-neutral-500 uppercase tracking-wider bg-[#1f1f1f] border-t border-neutral-700">
+                                                Kling AI
+                                            </div>
+                                            {availableImageModels.filter(m => m.provider === 'kling').map(model => (
+                                                <button
+                                                    key={model.id}
+                                                    onClick={() => handleImageModelChange(model.id)}
+                                                    className={`w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-[#333] transition-colors ${currentImageModel.id === model.id ? 'text-blue-400' : 'text-neutral-300'
+                                                        }`}
+                                                >
+                                                    <span className="flex items-center gap-2">
+                                                        <ImageIcon size={12} className="text-cyan-400" />
+                                                        {model.name}
+                                                        {model.recommended && (
+                                                            <span className="text-[9px] px-1 py-0.5 bg-green-600/30 text-green-400 rounded">REC</span>
+                                                        )}
+                                                    </span>
+                                                    {currentImageModel.id === model.id && <Check size={12} />}
+                                                </button>
+                                            ))}
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -398,114 +504,85 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
                 </div>
             </div>
 
-            {/* Advanced Settings Drawer */}
-            <div className="mt-2 pt-2 border-t border-neutral-800">
-                <button
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                    className="w-full flex items-center justify-center gap-1 cursor-pointer"
-                >
-                    <span className="text-[10px] text-neutral-600 uppercase tracking-widest hover:text-neutral-400">
-                        Advanced Settings
-                    </span>
-                    {showAdvanced ? (
-                        <ChevronUp size={12} className="text-neutral-600" />
-                    ) : (
-                        <ChevronDown size={12} className="text-neutral-600" />
-                    )}
-                </button>
-
-                {/* Advanced Settings Content - Only for Video nodes */}
-                {showAdvanced && isVideoNode && (
-                    <div className="mt-3 space-y-3">
-                        {/* Video Mode Toggle */}
-                        <div className="space-y-2">
-                            <label className="text-[10px] text-neutral-500 uppercase tracking-wider">Video Mode</label>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => handleVideoModeChange('standard')}
-                                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${data.videoMode !== 'frame-to-frame'
-                                        ? 'bg-blue-600 text-white'
-                                        : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
-                                        }`}
-                                >
-                                    <Film size={12} />
-                                    Standard
-                                </button>
-                                <button
-                                    onClick={() => handleVideoModeChange('frame-to-frame')}
-                                    disabled={!hasConnectedImages}
-                                    className={`flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${data.videoMode === 'frame-to-frame'
-                                        ? 'bg-cyan-600 text-white'
-                                        : hasConnectedImages
-                                            ? 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
-                                            : 'bg-neutral-800/50 text-neutral-600 cursor-not-allowed'
-                                        }`}
-                                    title={!hasConnectedImages ? 'Connect image nodes first' : ''}
-                                >
-                                    <ImageIcon size={12} />
-                                    Frame-to-Frame
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Frame Inputs - Only show when frame-to-frame mode is active */}
-                        {data.videoMode === 'frame-to-frame' && (
-                            <div className="space-y-2">
-                                <label className="text-[10px] text-neutral-500 uppercase tracking-wider">
-                                    Connected Frames <span className="text-neutral-600">(drag to reorder)</span>
-                                </label>
-
-                                {frameInputsWithUrls.length === 0 ? (
-                                    <div className="text-xs text-neutral-600 italic py-2">
-                                        Connect image nodes to use as start/end frames
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {frameInputsWithUrls.map((input, index) => (
-                                            <div
-                                                key={input.nodeId}
-                                                draggable
-                                                onDragStart={() => setDraggedIndex(index)}
-                                                onDragOver={(e) => e.preventDefault()}
-                                                onDrop={() => {
-                                                    if (draggedIndex !== null) {
-                                                        handleFrameReorder(draggedIndex, index);
-                                                        setDraggedIndex(null);
-                                                    }
-                                                }}
-                                                onDragEnd={() => setDraggedIndex(null)}
-                                                className={`flex items-center gap-2 p-2 bg-neutral-800 rounded-lg cursor-grab active:cursor-grabbing transition-all ${draggedIndex === index ? 'opacity-50 scale-95' : ''
-                                                    }`}
-                                            >
-                                                <GripVertical size={14} className="text-neutral-600" />
-                                                <img
-                                                    src={input.url}
-                                                    alt={`Frame ${index + 1}`}
-                                                    className="w-12 h-12 object-cover rounded"
-                                                />
-                                                <div className="flex-1">
-                                                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${input.order === 'start'
-                                                        ? 'bg-green-600/30 text-green-400'
-                                                        : 'bg-orange-600/30 text-orange-400'
-                                                        }`}>
-                                                        {input.order === 'start' ? 'START' : 'END'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {connectedImageNodes.length > frameInputsWithUrls.length && (
-                                    <div className="text-xs text-neutral-500 mt-1">
-                                        {connectedImageNodes.length - frameInputsWithUrls.length} more connected image(s) available
-                                    </div>
-                                )}
-                            </div>
+            {/* Advanced Settings Drawer - Only for Video nodes */}
+            {isVideoNode && (
+                <div className="mt-2 pt-2 border-t border-neutral-800">
+                    <button
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                        className="w-full flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                        <span className="text-[10px] text-neutral-600 uppercase tracking-widest hover:text-neutral-400">
+                            Advanced Settings
+                        </span>
+                        {showAdvanced ? (
+                            <ChevronUp size={12} className="text-neutral-600" />
+                        ) : (
+                            <ChevronDown size={12} className="text-neutral-600" />
                         )}
-                    </div>
-                )}
-            </div>
+                    </button>
+
+                    {/* Advanced Settings Content - Only for Video nodes */}
+                    {showAdvanced && isVideoNode && (
+                        <div className="mt-3 space-y-3">
+                            {/* Frame Inputs - Show when 2+ images are connected */}
+                            {connectedImageNodes.length >= 2 && (
+                                <div className="space-y-2">
+                                    <label className="text-[10px] text-neutral-500 uppercase tracking-wider">
+                                        Connected Frames <span className="text-neutral-600">(drag to reorder)</span>
+                                    </label>
+
+                                    {frameInputsWithUrls.length === 0 ? (
+                                        <div className="text-xs text-neutral-600 italic py-2">
+                                            Connect image nodes to use as start/end frames
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {frameInputsWithUrls.map((input, index) => (
+                                                <div
+                                                    key={input.nodeId}
+                                                    draggable
+                                                    onDragStart={() => setDraggedIndex(index)}
+                                                    onDragOver={(e) => e.preventDefault()}
+                                                    onDrop={() => {
+                                                        if (draggedIndex !== null) {
+                                                            handleFrameReorder(draggedIndex, index);
+                                                            setDraggedIndex(null);
+                                                        }
+                                                    }}
+                                                    onDragEnd={() => setDraggedIndex(null)}
+                                                    className={`flex items-center gap-2 p-2 bg-neutral-800 rounded-lg cursor-grab active:cursor-grabbing transition-all ${draggedIndex === index ? 'opacity-50 scale-95' : ''
+                                                        }`}
+                                                >
+                                                    <GripVertical size={14} className="text-neutral-600" />
+                                                    <img
+                                                        src={input.url}
+                                                        alt={`Frame ${index + 1}`}
+                                                        className="w-12 h-12 object-cover rounded"
+                                                    />
+                                                    <div className="flex-1">
+                                                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${input.order === 'start'
+                                                            ? 'bg-green-600/30 text-green-400'
+                                                            : 'bg-orange-600/30 text-orange-400'
+                                                            }`}>
+                                                            {input.order === 'start' ? 'START' : 'END'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {connectedImageNodes.length > frameInputsWithUrls.length && (
+                                        <div className="text-xs text-neutral-500 mt-1">
+                                            {connectedImageNodes.length - frameInputsWithUrls.length} more connected image(s) available
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

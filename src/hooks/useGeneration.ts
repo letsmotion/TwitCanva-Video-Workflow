@@ -89,24 +89,38 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
                 let imageBase64: string | undefined;
                 let lastFrameBase64: string | undefined;
 
-                // Check for frame-to-frame mode
-                if (node.videoMode === 'frame-to-frame' && node.frameInputs && node.frameInputs.length > 0) {
-                    // Get start and end frames from frameInputs
-                    const startFrameInput = node.frameInputs.find(f => f.order === 'start');
-                    const endFrameInput = node.frameInputs.find(f => f.order === 'end');
+                // Check for frame-to-frame mode (explicit or auto-detected from 2+ parents)
+                const hasMultipleInputs = (node.parentIds && node.parentIds.length >= 2);
+                const hasExplicitFrameInputs = node.frameInputs && node.frameInputs.length >= 2;
+                const isFrameToFrame = node.videoMode === 'frame-to-frame' || hasMultipleInputs || hasExplicitFrameInputs;
 
-                    if (startFrameInput) {
-                        const startNode = nodes.find(n => n.id === startFrameInput.nodeId);
-                        if (startNode?.resultUrl) {
-                            imageBase64 = startNode.resultUrl;
-                        }
-                    }
+                if (isFrameToFrame && node.parentIds && node.parentIds.length >= 2) {
+                    // Get start and end frames from frameInputs (if user reordered) or default order
+                    const parent1 = nodes.find(n => n.id === node.parentIds![0]);
+                    const parent2 = nodes.find(n => n.id === node.parentIds![1]);
 
-                    if (endFrameInput) {
-                        const endNode = nodes.find(n => n.id === endFrameInput.nodeId);
-                        if (endNode?.resultUrl) {
-                            lastFrameBase64 = endNode.resultUrl;
+                    // Check if user has explicitly set frame order
+                    if (node.frameInputs && node.frameInputs.length >= 2) {
+                        const startFrameInput = node.frameInputs.find(f => f.order === 'start');
+                        const endFrameInput = node.frameInputs.find(f => f.order === 'end');
+
+                        if (startFrameInput) {
+                            const startNode = nodes.find(n => n.id === startFrameInput.nodeId);
+                            if (startNode?.resultUrl) {
+                                imageBase64 = startNode.resultUrl;
+                            }
                         }
+
+                        if (endFrameInput) {
+                            const endNode = nodes.find(n => n.id === endFrameInput.nodeId);
+                            if (endNode?.resultUrl) {
+                                lastFrameBase64 = endNode.resultUrl;
+                            }
+                        }
+                    } else {
+                        // Default: first parent = start, second parent = end
+                        if (parent1?.resultUrl) imageBase64 = parent1.resultUrl;
+                        if (parent2?.resultUrl) lastFrameBase64 = parent2.resultUrl;
                     }
                 } else if (node.parentIds && node.parentIds.length > 0) {
                     // Standard mode: get first parent image
