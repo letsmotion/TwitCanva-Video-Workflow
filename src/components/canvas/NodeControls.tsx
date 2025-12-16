@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect, memo } from 'react';
-import { Sparkles, Banana, Settings2, Check, ChevronDown, ChevronUp, GripVertical, Image as ImageIcon, Film, Clock } from 'lucide-react';
+import { Sparkles, Banana, Settings2, Check, ChevronDown, ChevronUp, GripVertical, Image as ImageIcon, Film, Clock, Expand, Shrink } from 'lucide-react';
 import { NodeData, NodeStatus, NodeType } from '../../types';
 
 interface NodeControlsProps {
@@ -325,28 +325,43 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
             onPointerDown={(e) => e.stopPropagation()} // Allow selecting text/interacting without dragging
             onClick={() => onSelect(data.id)} // Ensure clicking here selects the node
         >
-            <textarea
-                className="w-full bg-transparent text-sm text-white placeholder-neutral-600 outline-none resize-none mb-3 font-light"
-                placeholder={
-                    data.type === NodeType.VIDEO && isFrameToFrame && currentVideoModel.provider === 'kling'
-                        ? "Prompt optional for Kling frame-to-frame..."
-                        : data.type === NodeType.VIDEO && inputUrl
-                            ? "Describe how to animate this frame..."
-                            : "Describe what you want to generate..."
-                }
-                rows={4}
-                value={localPrompt}
-                onChange={(e) => handlePromptChange(e.target.value)}
-                onBlur={() => {
-                    // Ensure final value is saved on blur
-                    if (updateTimeoutRef.current) {
-                        clearTimeout(updateTimeoutRef.current);
+            {/* Prompt Textarea with Expand Button */}
+            <div className="mb-3">
+                <textarea
+                    className="w-full bg-transparent text-sm text-white placeholder-neutral-600 outline-none resize-none font-light"
+                    placeholder={
+                        data.type === NodeType.VIDEO && isFrameToFrame && currentVideoModel.provider === 'kling'
+                            ? "Prompt optional for Kling frame-to-frame..."
+                            : data.type === NodeType.VIDEO && inputUrl
+                                ? "Describe how to animate this frame..."
+                                : "Describe what you want to generate..."
                     }
-                    if (localPrompt !== data.prompt) {
-                        onUpdate(data.id, { prompt: localPrompt });
-                    }
-                }}
-            />
+                    rows={data.isPromptExpanded ? 12 : 4}
+                    value={localPrompt}
+                    onChange={(e) => handlePromptChange(e.target.value)}
+                    onWheel={(e) => e.stopPropagation()}
+                    onBlur={() => {
+                        // Ensure final value is saved on blur
+                        if (updateTimeoutRef.current) {
+                            clearTimeout(updateTimeoutRef.current);
+                        }
+                        if (localPrompt !== data.prompt) {
+                            onUpdate(data.id, { prompt: localPrompt });
+                        }
+                    }}
+                />
+                {/* Expand/Shrink Button - Below textarea */}
+                <div className="flex justify-end mt-1">
+                    <button
+                        onClick={() => onUpdate(data.id, { isPromptExpanded: !data.isPromptExpanded })}
+                        className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-neutral-500 hover:text-white hover:bg-neutral-700 rounded transition-colors"
+                        title={data.isPromptExpanded ? 'Shrink prompt' : 'Expand prompt'}
+                    >
+                        {data.isPromptExpanded ? <Shrink size={12} /> : <Expand size={12} />}
+                        <span>{data.isPromptExpanded ? 'Shrink' : 'Expand'}</span>
+                    </button>
+                </div>
+            </div>
 
             {data.errorMessage && (
                 <div className="text-red-400 text-xs mb-2 p-1 bg-red-900/20 rounded border border-red-900/50">

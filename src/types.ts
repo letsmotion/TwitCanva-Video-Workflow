@@ -44,6 +44,7 @@ export interface NodeData {
   imageModel?: string; // Image model version (e.g., 'gemini-pro', 'kling-v2')
   aspectRatio: string;
   resolution: string;
+  isPromptExpanded?: boolean; // Whether the prompt editing area is expanded
 }
 
 export interface ContextMenuState {

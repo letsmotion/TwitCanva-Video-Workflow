@@ -6,7 +6,7 @@
  */
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Loader2, Maximize2, ImageIcon as ImageIcon, Film, Upload, Pencil, Video, GripVertical, Download } from 'lucide-react';
+import { Loader2, Maximize2, ImageIcon as ImageIcon, Film, Upload, Pencil, Video, GripVertical, Download, Expand, Shrink } from 'lucide-react';
 import { NodeData, NodeStatus, NodeType } from '../../types';
 
 interface NodeContentProps {
@@ -211,6 +211,7 @@ export const NodeContent: React.FC<NodeContentProps> = ({
                                 value={localPrompt}
                                 onChange={(e) => handleTextChange(e.target.value)}
                                 onPointerDown={(e) => e.stopPropagation()}
+                                onWheel={(e) => e.stopPropagation()}
                                 onBlur={() => {
                                     // Ensure final value is saved on blur
                                     if (updateTimeoutRef.current) {
@@ -221,9 +222,22 @@ export const NodeContent: React.FC<NodeContentProps> = ({
                                     }
                                 }}
                                 placeholder="Write your text content here..."
-                                className="w-full min-h-[150px] bg-transparent text-white text-sm resize-none outline-none placeholder:text-neutral-600"
+                                className="w-full bg-transparent text-white text-sm resize-none outline-none placeholder:text-neutral-600"
+                                style={{ minHeight: data.isPromptExpanded ? '300px' : '150px' }}
                                 autoFocus
                             />
+                            {/* Expand/Shrink Button */}
+                            <div className="flex justify-end mt-2">
+                                <button
+                                    onClick={() => onUpdate?.(data.id, { isPromptExpanded: !data.isPromptExpanded })}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] text-neutral-500 hover:text-white hover:bg-neutral-700 rounded transition-colors"
+                                    title={data.isPromptExpanded ? 'Shrink text area' : 'Expand text area'}
+                                >
+                                    {data.isPromptExpanded ? <Shrink size={12} /> : <Expand size={12} />}
+                                    <span>{data.isPromptExpanded ? 'Shrink' : 'Expand'}</span>
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         /* Menu Mode - Show Options */
