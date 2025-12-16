@@ -33,8 +33,7 @@ function mapHailuoModelName(modelId, hasFirstFrame, hasLastFrame) {
     const mapping = {
         'hailuo-2.3': 'MiniMax-Hailuo-2.3',
         'hailuo-2.3-fast': 'MiniMax-Hailuo-2.3-Fast',
-        'hailuo-02': 'MiniMax-Hailuo-02',
-        'hailuo-o2': 'MiniMax-Hailuo-O2'
+        'hailuo-02': 'MiniMax-Hailuo-02'
     };
     return mapping[modelId] || 'MiniMax-Hailuo-2.3';
 }
@@ -214,7 +213,28 @@ export async function generateHailuoVideo({
     const mode = hasLastFrame ? 'FL2V (First+Last Frame)' :
         hasFirstFrame ? 'I2V (Image-to-Video)' :
             'T2V (Text-to-Video)';
-    console.log(`Hailuo Video Gen: ${mode}, model: ${modelName}, resolution: ${mappedResolution}`);
+
+    console.log('Calling Hailuo API with args:', {
+        model: modelName,
+        mode: mode,
+        prompt: (prompt || '').substring(0, 100) + '...',
+        duration: body.duration,
+        resolution: mappedResolution,
+        aspect_ratio: mappedAspectRatio,
+        has_first_frame: hasFirstFrame,
+        has_last_frame: hasLastFrame,
+        requestedDuration: duration
+    });
+
+    // Log exact request body (without image data)
+    const bodyForLogging = { ...body };
+    if (bodyForLogging.first_frame_image) {
+        bodyForLogging.first_frame_image = `[BASE64 IMAGE - ${bodyForLogging.first_frame_image.length} chars]`;
+    }
+    if (bodyForLogging.last_frame_image) {
+        bodyForLogging.last_frame_image = `[BASE64 IMAGE - ${bodyForLogging.last_frame_image.length} chars]`;
+    }
+    console.log('Hailuo request body:', JSON.stringify(bodyForLogging, null, 2));
 
     // Create task
     const response = await fetch(`${HAILUO_BASE_URL}/video_generation`, {
@@ -227,6 +247,9 @@ export async function generateHailuoVideo({
     });
 
     const result = await response.json();
+
+    // Log full response for debugging
+    console.log('Hailuo task creation response:', JSON.stringify(result, null, 2));
 
     // Check for API error
     if (result.base_resp && result.base_resp.status_code !== 0) {
