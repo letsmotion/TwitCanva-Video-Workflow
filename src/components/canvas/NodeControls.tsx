@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useRef, useEffect, memo } from 'react';
-import { Sparkles, Banana, Settings2, Check, ChevronDown, ChevronUp, GripVertical, Image as ImageIcon, Film, Clock, Expand, Shrink } from 'lucide-react';
+import { Sparkles, Banana, Settings2, Check, ChevronDown, ChevronUp, GripVertical, Image as ImageIcon, Film, Clock, Expand, Shrink, Monitor } from 'lucide-react';
 import { NodeData, NodeStatus, NodeType } from '../../types';
 
 interface NodeControlsProps {
@@ -625,8 +625,9 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
                     <div className="relative" ref={dropdownRef}>
                         <button
                             onClick={() => setShowSizeDropdown(!showSizeDropdown)}
-                            className="flex items-center gap-1.5 text-xs font-medium bg-[#252525] hover:bg-[#333] border border-neutral-700 text-white px-3 py-1.5 rounded-lg transition-colors"
+                            className="flex items-center gap-1.5 text-xs font-medium bg-[#252525] hover:bg-[#333] border border-neutral-700 text-white px-2.5 py-1.5 rounded-lg transition-colors"
                         >
+                            {isVideoNode && <Monitor size={12} className="text-green-400" />}
                             {data.type === NodeType.VIDEO && currentSizeLabel === 'Auto' ? 'Auto' : currentSizeLabel}
                             {currentSizeLabel === 'Auto' && data.type !== NodeType.VIDEO && (
                                 <span className="text-[10px] text-neutral-400 ml-0.5 opacity-50">16:9</span>

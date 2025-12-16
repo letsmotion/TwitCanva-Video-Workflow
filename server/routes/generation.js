@@ -188,6 +188,7 @@ router.post('/generate-video', async (req, res) => {
                 imageBase64,
                 lastFrameBase64,
                 modelId: videoModel,
+                aspectRatio,
                 resolution,
                 duration: duration || 6,
                 apiKey: HAILUO_API_KEY

@@ -361,6 +361,16 @@ export default function App() {
   };
 
   /**
+   * Convert pixel dimensions to closest video aspect ratio (only 16:9 or 9:16)
+   */
+  const getClosestVideoAspectRatio = (width: number, height: number): string => {
+    const ratio = width / height;
+    // Video models only support 16:9 (1.78) and 9:16 (0.56)
+    // If wider than 1:1 (ratio > 1), use 16:9; otherwise use 9:16
+    return ratio >= 1 ? '16:9' : '9:16';
+  };
+
+  /**
    * Handle selecting an asset from history - creates new node with the image/video
    */
   const handleSelectAsset = (type: 'images' | 'videos', url: string, prompt: string) => {
@@ -410,7 +420,8 @@ export default function App() {
       const video = document.createElement('video');
       video.onloadedmetadata = () => {
         const resultAspectRatio = `${video.videoWidth}/${video.videoHeight}`;
-        const aspectRatio = getClosestAspectRatio(video.videoWidth, video.videoHeight);
+        // Use video-specific function that only returns 16:9 or 9:16
+        const aspectRatio = getClosestVideoAspectRatio(video.videoWidth, video.videoHeight);
         console.log(`[App] Video loaded: ${video.videoWidth}x${video.videoHeight} -> ${aspectRatio}`);
         createNode(resultAspectRatio, aspectRatio);
       };

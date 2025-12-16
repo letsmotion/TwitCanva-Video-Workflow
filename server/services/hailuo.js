@@ -162,6 +162,7 @@ export async function generateHailuoVideo({
     imageBase64,
     lastFrameBase64,
     modelId,
+    aspectRatio,
     resolution,
     duration,
     apiKey
@@ -175,12 +176,16 @@ export async function generateHailuoVideo({
     const modelName = mapHailuoModelName(modelId, hasFirstFrame, hasLastFrame);
     const mappedResolution = mapResolution(resolution);
 
+    // Map aspect ratio - default to 16:9
+    const mappedAspectRatio = aspectRatio === '9:16' ? '9:16' : '16:9';
+
     // Prepare request body - duration can be 6 or 10 seconds for Hailuo
     const body = {
         model: modelName,
         prompt: prompt || '',
         duration: duration || 6,
-        resolution: mappedResolution
+        resolution: mappedResolution,
+        aspect_ratio: mappedAspectRatio
     };
 
     // Add first frame image if provided

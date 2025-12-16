@@ -161,11 +161,15 @@ export async function generateKlingVideo({ prompt, imageBase64, lastFrameBase64,
     // Use 'pro' mode when doing frame-to-frame (with end frame), otherwise 'std'
     const useProMode = !!lastFrameBase64;
 
+    // Map aspect ratio - default to 16:9
+    const mappedAspectRatio = aspectRatio === '9:16' ? '9:16' : '16:9';
+
     // Prepare request body - duration can be 5 or 10 seconds
     const body = {
         model_name: modelName,
         mode: useProMode ? 'pro' : 'std',
         duration: String(duration || 5),
+        aspect_ratio: mappedAspectRatio,
         prompt: prompt || ''
     };
 
