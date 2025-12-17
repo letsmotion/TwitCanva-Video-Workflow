@@ -53,9 +53,22 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio || 'Auto');
     const [selectedResolution, setSelectedResolution] = useState(initialResolution || '1K');
 
+    // Drawing mode state
+    const [isDrawingMode, setIsDrawingMode] = useState(false);
+    const [drawingTool, setDrawingTool] = useState<'brush' | 'eraser'>('brush');
+    const [brushWidth, setBrushWidth] = useState(4);
+    const [eraserWidth, setEraserWidth] = useState(10);
+    const [brushColor, setBrushColor] = useState('#ff0000');
+    const [showToolSettings, setShowToolSettings] = useState(false);
+
     const modelDropdownRef = useRef<HTMLDivElement>(null);
     const aspectDropdownRef = useRef<HTMLDivElement>(null);
     const resolutionDropdownRef = useRef<HTMLDivElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const isDrawingRef = useRef(false);
+    const lastPointRef = useRef<{ x: number; y: number } | null>(null);
+    const imageContainerRef = useRef<HTMLDivElement>(null);
+    const imageRef = useRef<HTMLImageElement>(null);
 
     const currentModel = IMAGE_MODELS.find(m => m.id === selectedModel) || IMAGE_MODELS[0];
 
@@ -66,6 +79,16 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
         setSelectedAspectRatio(initialAspectRatio || 'Auto');
         setSelectedResolution(initialResolution || '1K');
     }, [initialPrompt, initialModel, initialAspectRatio, initialResolution]);
+
+    // Initialize canvas size when drawing mode is enabled
+    useEffect(() => {
+        if (isDrawingMode && imageRef.current && canvasRef.current) {
+            const img = imageRef.current;
+            const canvas = canvasRef.current;
+            canvas.width = img.clientWidth;
+            canvas.height = img.clientHeight;
+        }
+    }, [isDrawingMode]);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -121,6 +144,79 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
         setShowResolutionDropdown(false);
     };
 
+    // ============================================================================
+    // DRAWING FUNCTIONS
+    // ============================================================================
+
+    const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return { x: 0, y: 0 };
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+        };
+    };
+
+    const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (!isDrawingMode) return;
+        isDrawingRef.current = true;
+        const coords = getCanvasCoordinates(e);
+        lastPointRef.current = coords;
+
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext('2d');
+        if (!ctx) return;
+
+        const currentWidth = drawingTool === 'eraser' ? eraserWidth : brushWidth;
+
+        ctx.beginPath();
+        ctx.arc(coords.x, coords.y, currentWidth / 2, 0, Math.PI * 2);
+        ctx.fillStyle = drawingTool === 'eraser' ? 'rgba(0,0,0,1)' : brushColor;
+        if (drawingTool === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+        } else {
+            ctx.globalCompositeOperation = 'source-over';
+        }
+        ctx.fill();
+    };
+
+    const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (!isDrawingMode || !isDrawingRef.current) return;
+
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext('2d');
+        if (!ctx || !lastPointRef.current) return;
+
+        const coords = getCanvasCoordinates(e);
+        const currentWidth = drawingTool === 'eraser' ? eraserWidth : brushWidth;
+
+        ctx.beginPath();
+        ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y);
+        ctx.lineTo(coords.x, coords.y);
+        ctx.strokeStyle = drawingTool === 'eraser' ? 'rgba(0,0,0,1)' : brushColor;
+        ctx.lineWidth = currentWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        if (drawingTool === 'eraser') {
+            ctx.globalCompositeOperation = 'destination-out';
+        } else {
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        ctx.stroke();
+        lastPointRef.current = coords;
+    };
+
+    const stopDrawing = () => {
+        isDrawingRef.current = false;
+        lastPointRef.current = null;
+    };
+
+    // Preset colors for brush
+    const presetColors = ['#ff0000', '#3b82f6', '#22c55e', '#eab308', '#ec4899', '#8b5cf6'];
+
     if (!isOpen) return null;
 
     // Filter models that support image-to-image (since we have an input image)
@@ -170,13 +266,173 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Drawing Sub-Toolbar - Only visible when drawing mode is active */}
+                {isDrawingMode && (
+                    <div className="flex justify-center py-3 relative z-50">
+                        <div className="bg-[#2a2a2a] bg-opacity-95 backdrop-blur-sm rounded-xl border border-neutral-600 px-2 py-1.5 flex items-center gap-1 shadow-2xl">
+                            {/* Brush Button with Settings Panel */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => {
+                                        setDrawingTool('brush');
+                                        // Toggle settings if already brush, close if switching from eraser
+                                        if (drawingTool === 'brush') {
+                                            setShowToolSettings(!showToolSettings);
+                                        } else {
+                                            setShowToolSettings(true);
+                                        }
+                                    }}
+                                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${drawingTool === 'brush'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'hover:bg-neutral-700 text-neutral-400'
+                                        }`}
+                                    title="Brush"
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                                    </svg>
+                                </button>
+
+                                {/* Brush Settings Panel */}
+                                {showToolSettings && drawingTool === 'brush' && (
+                                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-[#2a2a2a] border border-neutral-600 rounded-xl p-4 shadow-2xl z-50 min-w-[200px]">
+                                        {/* Brush Width */}
+                                        <div className="mb-4">
+                                            <div className="flex items-center justify-between text-sm text-neutral-300 mb-2">
+                                                <span>Brush Width</span>
+                                                <span>{brushWidth}</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="1"
+                                                max="20"
+                                                value={brushWidth}
+                                                onChange={(e) => setBrushWidth(parseInt(e.target.value))}
+                                                className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                            />
+                                        </div>
+
+                                        {/* Preset Colors */}
+                                        <div className="mb-3">
+                                            <div className="text-sm text-neutral-300 mb-2">Preset Colors</div>
+                                            <div className="flex gap-2">
+                                                {presetColors.map((color) => (
+                                                    <button
+                                                        key={color}
+                                                        onClick={() => setBrushColor(color)}
+                                                        className={`w-8 h-8 rounded-lg border-2 transition-all ${brushColor === color
+                                                            ? 'border-white scale-110'
+                                                            : 'border-transparent hover:border-neutral-500'
+                                                            }`}
+                                                        style={{ backgroundColor: color }}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Custom Color */}
+                                        <div>
+                                            <div className="text-sm text-neutral-300 mb-2">Custom Color</div>
+                                            <input
+                                                type="color"
+                                                value={brushColor}
+                                                onChange={(e) => setBrushColor(e.target.value)}
+                                                className="w-full h-10 rounded-lg cursor-pointer border border-neutral-600"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Eraser Button with Settings Panel */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => {
+                                        setDrawingTool('eraser');
+                                        // Toggle settings if already eraser, close if switching from brush
+                                        if (drawingTool === 'eraser') {
+                                            setShowToolSettings(!showToolSettings);
+                                        } else {
+                                            setShowToolSettings(true);
+                                        }
+                                    }}
+                                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${drawingTool === 'eraser'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'hover:bg-neutral-700 text-neutral-400'
+                                        }`}
+                                    title="Eraser"
+                                >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+                                        <path d="M22 21H7" />
+                                        <path d="m5 11 9 9" />
+                                    </svg>
+                                </button>
+
+                                {/* Eraser Settings Panel */}
+                                {showToolSettings && drawingTool === 'eraser' && (
+                                    <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-[#2a2a2a] border border-neutral-600 rounded-xl p-4 shadow-2xl z-50 min-w-[200px]">
+                                        {/* Eraser Width */}
+                                        <div>
+                                            <div className="flex items-center justify-between text-sm text-neutral-300 mb-2">
+                                                <span>Eraser Width</span>
+                                                <span>{eraserWidth}</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="1"
+                                                max="50"
+                                                value={eraserWidth}
+                                                onChange={(e) => setEraserWidth(parseInt(e.target.value))}
+                                                className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="w-0"></div>
 
                 {/* Canvas Area */}
                 <div className="flex-1 flex items-center justify-center bg-black p-8">
                     {imageUrl ? (
-                        <img src={imageUrl} alt="Editing" className="max-w-full max-h-full object-contain" />
+                        <div ref={imageContainerRef} className="relative">
+                            <img
+                                ref={imageRef}
+                                src={imageUrl}
+                                alt="Editing"
+                                className="max-w-full max-h-full object-contain"
+                                onLoad={(e) => {
+                                    // Set canvas size to match image
+                                    const img = e.currentTarget;
+                                    const canvas = canvasRef.current;
+                                    if (canvas) {
+                                        canvas.width = img.clientWidth;
+                                        canvas.height = img.clientHeight;
+                                    }
+                                }}
+                            />
+                            {/* Drawing Canvas Overlay */}
+                            {isDrawingMode && (
+                                <canvas
+                                    ref={canvasRef}
+                                    className="absolute inset-0"
+                                    style={{
+                                        cursor: drawingTool === 'eraser'
+                                            ? `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="${eraserWidth}" height="${eraserWidth}" viewBox="0 0 ${eraserWidth} ${eraserWidth}"><circle cx="${eraserWidth / 2}" cy="${eraserWidth / 2}" r="${eraserWidth / 2 - 1}" fill="rgba(255,255,255,0.3)" stroke="white" stroke-width="1"/></svg>') ${eraserWidth / 2} ${eraserWidth / 2}, auto`
+                                            : 'crosshair'
+                                    }}
+                                    onMouseDown={startDrawing}
+                                    onMouseMove={draw}
+                                    onMouseUp={stopDrawing}
+                                    onMouseLeave={stopDrawing}
+                                />
+                            )}
+                        </div>
                     ) : (
                         <div className="w-[600px] h-[400px] bg-neutral-100 rounded flex items-center justify-center">
                             <span className="text-neutral-400">No image loaded</span>
@@ -192,7 +448,17 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
                 <div className="bg-[#2a2a2a] bg-opacity-95 backdrop-blur-sm rounded-xl border border-neutral-600 px-2 py-1.5 flex items-center gap-1 shadow-2xl pointer-events-auto">
                     {/* Drawing Mode (Pen) */}
                     <button
-                        className="w-9 h-9 rounded-lg hover:bg-neutral-700 flex items-center justify-center text-neutral-400 transition-colors"
+                        onClick={() => {
+                            setIsDrawingMode(!isDrawingMode);
+                            if (!isDrawingMode) {
+                                setDrawingTool('brush');
+                                setShowToolSettings(false);
+                            }
+                        }}
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${isDrawingMode
+                            ? 'bg-blue-600 text-white'
+                            : 'hover:bg-neutral-700 text-neutral-400'
+                            }`}
                         title="Drawing Mode"
                     >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
