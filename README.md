@@ -3,7 +3,7 @@
   <h1>TwitCanva</h1>
 </div>
 
-A modern, AI-powered canvas application for generating and manipulating images and videos using Google Gemini, Kling AI, and Hailuo AI (MiniMax). Built with React, TypeScript, and Vite.
+A modern, AI-powered canvas application for generating and manipulating images and videos using OpenAI GPT Image, Google Gemini, Kling AI, and Hailuo AI (MiniMax). Built with React, TypeScript, and Vite.
 
 ![TwitCanva](https://img.shields.io/badge/React-18.3.1-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6.2-blue)
@@ -13,7 +13,7 @@ A modern, AI-powered canvas application for generating and manipulating images a
 ## ✨ Features
 
 - **🎨 Visual Canvas Interface** - Drag-and-drop node-based workflow
-- **🤖 Multi-Model AI Generation** - Gemini Pro, Kling V1-V2.5 for images
+- **🤖 Multi-Model AI Generation** - GPT Image 1.5, Gemini Pro, Kling V1-V2.5 for images
 - **🎬 Multi-Model Video Generation** - Veo 3.1, Kling V1-V2.5, Hailuo 2.3/O2 for videos
 - **🖼️ Image-to-Image** - Use reference images for generation
 - **📽️ Frame-to-Frame Video** - Animate between start and end frames
@@ -51,6 +51,8 @@ This is not the perfect one, but it is a good start. Give me a try, and let me k
 - Kling AI API keys (get them at [Kling AI Developer](https://app.klingai.com/global/dev/api-key))
   - Requires purchasing API packages at [Kling AI Pricing](https://klingai.com/global/dev/pricing)
 - Hailuo AI API key (get one at [MiniMax Platform](https://platform.minimax.io/user-center/basic-information/interface-key))
+- OpenAI API key (get one at [OpenAI Platform](https://platform.openai.com/api-keys))
+  - Requires [organization verification](https://platform.openai.com/settings/organization/general) to use GPT Image models
 
 ### Installation
 
@@ -78,6 +80,9 @@ This is not the perfect one, but it is a good start. Give me a try, and let me k
    
    # Get from https://platform.minimax.io/user-center/basic-information/interface-key
    HAILUO_API_KEY=your_hailuo_api_key_here
+   
+   # Get from https://platform.openai.com/api-keys
+   OPENAI_API_KEY=your_openai_api_key_here
    ```
    
    > ⚠️ **Security**: API keys are stored server-side only and never exposed to the client.
@@ -139,7 +144,8 @@ TwitCanva/
 │   ├── services/                 # External API integrations
 │   │   ├── gemini.js             # Google Gemini/Veo service
 │   │   ├── kling.js              # Kling AI service (V1-V2.5)
-│   │   └── hailuo.js             # Hailuo AI (MiniMax) service
+│   │   ├── hailuo.js             # Hailuo AI (MiniMax) service
+│   │   └── openai.js             # OpenAI GPT Image service
 │   ├── utils/                    # Utility functions
 │   │   └── base64.js             # Base64 encoding helpers
 │   └── agent/                    # LangGraph chat agent
@@ -266,6 +272,7 @@ Your API key is **never exposed** to the browser:
 **Image Generation:**
 | Model | Provider | Image-to-Image | Multi-Image |
 |-------|----------|:-------------:|:-----------:|
+| GPT Image 1.5 | OpenAI | ✅ | ✅ |
 | Gemini Pro | Google | ✅ | ✅ |
 | Kling V1 | Kling AI | ✅ | ❌ |
 | Kling V1.5 | Kling AI | ✅ | ❌ |
@@ -325,6 +332,7 @@ This project is licensed under the MIT License.
 
 ## 🙏 Acknowledgments
 
+- OpenAI for GPT Image generation
 - Google Gemini API for AI generation
 - Kling AI for video generation
 - MiniMax for Hailuo AI video generation
@@ -334,4 +342,5 @@ This project is licensed under the MIT License.
 
 ---
 
-**Built with ❤️ using React, TypeScript, and AI APIs from Google, Kling, and MiniMax**
+**Built with ❤️ using React, TypeScript, and AI APIs from OpenAI, Google, Kling, and MiniMax**
+
