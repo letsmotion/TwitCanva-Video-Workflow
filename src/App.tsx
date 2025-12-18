@@ -28,6 +28,7 @@ import { useImageEditor } from './hooks/useImageEditor';
 import { usePanelState } from './hooks/usePanelState';
 import { useAssetHandlers } from './hooks/useAssetHandlers';
 import { useTextNodeHandlers } from './hooks/useTextNodeHandlers';
+import { useImageNodeHandlers } from './hooks/useImageNodeHandlers';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useContextMenuHandlers } from './hooks/useContextMenuHandlers';
 import { extractVideoLastFrame } from './utils/videoHelpers';
@@ -266,6 +267,12 @@ export default function App() {
     handleTextToVideo,
     handleTextToImage
   } = useTextNodeHandlers({ nodes, updateNode, setNodes, setSelectedNodeIds });
+
+  // Image node handlers
+  const {
+    handleImageToImage,
+    handleImageToVideo
+  } = useImageNodeHandlers({ nodes, setNodes, setSelectedNodeIds });
 
   // Asset handlers (create asset modal)
   const {
@@ -740,6 +747,8 @@ export default function App() {
                 onWriteContent={handleWriteContent}
                 onTextToVideo={handleTextToVideo}
                 onTextToImage={handleTextToImage}
+                onImageToImage={handleImageToImage}
+                onImageToVideo={handleImageToVideo}
               />
             ))}
           </div>

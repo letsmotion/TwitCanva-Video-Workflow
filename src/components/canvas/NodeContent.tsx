@@ -25,6 +25,9 @@ interface NodeContentProps {
     onWriteContent?: (nodeId: string) => void;
     onTextToVideo?: (nodeId: string) => void;
     onTextToImage?: (nodeId: string) => void;
+    // Image node callbacks
+    onImageToImage?: (nodeId: string) => void;
+    onImageToVideo?: (nodeId: string) => void;
     onUpdate?: (nodeId: string, updates: Partial<NodeData>) => void;
 }
 
@@ -43,6 +46,8 @@ export const NodeContent: React.FC<NodeContentProps> = ({
     onWriteContent,
     onTextToVideo,
     onTextToImage,
+    onImageToImage,
+    onImageToVideo,
     onUpdate
 }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -323,9 +328,17 @@ export const NodeContent: React.FC<NodeContentProps> = ({
                                         {data.type === NodeType.VIDEO && inputUrl ? "Ready to animate" : (data.type === NodeType.VIDEO ? "Waiting for input..." : "Try to:")}
                                     </div>
                                     {data.type !== NodeType.VIDEO && (
-                                        <div className="flex flex-col gap-1 text-xs text-neutral-600 text-center">
-                                            <span>• Image to Image</span>
-                                            <span>• Image to Video</span>
+                                        <div className="flex flex-col gap-1 w-full px-2">
+                                            <TextNodeMenuItem
+                                                icon={<ImageIcon size={16} />}
+                                                label="Image to Image"
+                                                onClick={() => onImageToImage?.(data.id)}
+                                            />
+                                            <TextNodeMenuItem
+                                                icon={<Film size={16} />}
+                                                label="Image to Video"
+                                                onClick={() => onImageToVideo?.(data.id)}
+                                            />
                                         </div>
                                     )}
                                 </>
