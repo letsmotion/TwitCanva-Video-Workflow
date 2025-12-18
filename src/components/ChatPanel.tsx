@@ -336,8 +336,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                         {/* Tip Card */}
                         {showTip && (
                             <div className="bg-neutral-800/50 rounded-2xl p-4 mb-4">
-                                <div className="bg-neutral-700/50 rounded-xl h-24 mb-3 flex items-center justify-center">
-                                    <div className="text-neutral-500 text-sm">Preview Area</div>
+                                <div className="bg-neutral-700/50 rounded-xl overflow-hidden mb-3 flex items-center justify-center">
+                                    <img
+                                        src="/chat-preview.gif"
+                                        alt="Drag and drop preview"
+                                        className="w-full h-auto object-cover rounded-xl"
+                                    />
                                 </div>
                                 <p className="text-neutral-400 text-sm leading-relaxed mb-3">
                                     Drag image/video nodes into the chat dialog to unlock advanced features like prompt generation based on node content, providing more inspiration for your creativity~
