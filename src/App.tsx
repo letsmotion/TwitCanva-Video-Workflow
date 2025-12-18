@@ -749,6 +749,7 @@ export default function App() {
                 onTextToImage={handleTextToImage}
                 onImageToImage={handleImageToImage}
                 onImageToVideo={handleImageToVideo}
+                zoom={viewport.zoom}
               />
             ))}
           </div>

@@ -20,6 +20,7 @@ interface NodeControlsProps {
     onUpdate: (id: string, updates: Partial<NodeData>) => void;
     onGenerate: (id: string) => void;
     onSelect: (id: string) => void;
+    zoom: number;
 }
 
 const IMAGE_RATIOS = [
@@ -138,7 +139,8 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
     connectedImageNodes = [],
     onUpdate,
     onGenerate,
-    onSelect
+    onSelect,
+    zoom
 }) => {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [showSizeDropdown, setShowSizeDropdown] = useState(false);
@@ -420,9 +422,21 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
         return 0;
     });
 
+    // Inverse scaling for the prompt bar to keep it readable when zooming out
+    // When zooming in (zoom > 0.8), we let it zoom 1:1 with the canvas (localScale = 1)
+    // When zooming out (zoom < 0.8), we keep it at least at 0.8 effective scale
+    const minEffectiveScale = 0.8;
+    const effectiveScale = Math.max(zoom, minEffectiveScale);
+    const localScale = effectiveScale / zoom;
+
     return (
         <div
-            className="p-3 bg-[#1a1a1a] border-t border-neutral-800 rounded-b-2xl cursor-default"
+            className="p-4 bg-[#1a1a1a] border border-neutral-800 rounded-2xl shadow-2xl cursor-default w-full"
+            style={{
+                transform: `scale(${localScale})`,
+                transformOrigin: 'top center',
+                transition: 'transform 0.1s ease-out'
+            }}
             onPointerDown={(e) => e.stopPropagation()} // Allow selecting text/interacting without dragging
             onClick={() => onSelect(data.id)} // Ensure clicking here selects the node
         >

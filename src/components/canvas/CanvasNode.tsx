@@ -36,6 +36,7 @@ interface CanvasNodeProps {
   // Image node callbacks
   onImageToImage?: (nodeId: string) => void;
   onImageToVideo?: (nodeId: string) => void;
+  zoom: number;
 }
 
 export const CanvasNode: React.FC<CanvasNodeProps> = ({
@@ -60,7 +61,8 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
   onTextToVideo,
   onTextToImage,
   onImageToImage,
-  onImageToVideo
+  onImageToVideo,
+  zoom
 }) => {
   // ============================================================================
   // STATE
@@ -237,90 +239,107 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
     );
   }
 
+  // Calculate scaling factor to ensure node doesn't exceed window size when zooming in
+  const nodeWidth = 600; // Expected max width of prompt area
+  const nodeHeight = 650; // Expected max height of node + prompt area
+
+  const widthScaleLimit = (window.innerWidth * 0.9) / (nodeWidth * zoom);
+  const heightScaleLimit = (window.innerHeight * 0.9) / (nodeHeight * zoom);
+
+  // Only scale down if the node on screen would exceed 90% of window size
+  const autoScale = Math.min(1, widthScaleLimit, heightScaleLimit);
+
   return (
     <div
-      className={`absolute flex items-center group/node touch-none pointer-events-auto`}
+      className={`absolute group/node touch-none pointer-events-auto`}
       style={{
-        transform: `translate(${data.x}px, ${data.y}px)`,
+        transform: `translate(${data.x}px, ${data.y}px) scale(${autoScale})`,
         transition: 'box-shadow 0.2s',
-        zIndex: selected ? 50 : 10
+        zIndex: selected ? 50 : 10,
+        transformOrigin: 'top left' // Anchor at top-left to prevent shifting
       }}
       onPointerDown={(e) => onNodePointerDown(e, data.id)}
       onContextMenu={(e) => onContextMenu(e, data.id)}
     >
       <NodeConnectors nodeId={data.id} onConnectorDown={onConnectorDown} />
 
-      {/* Main Node Card - Video nodes are wider to fit more controls */}
-      <div
-        className={`relative ${data.type === NodeType.VIDEO ? 'w-[385px]' : 'w-[365px]'} rounded-2xl bg-[#0f0f0f] border transition-all duration-200 flex flex-col shadow-2xl ${selected ? 'border-blue-500/50 ring-1 ring-blue-500/30' : 'border-transparent'}`}
-      >
-        {/* Header (Editable Title) */}
-        {isEditingTitle ? (
-          <input
-            ref={titleInputRef}
-            type="text"
-            value={editedTitle}
-            onChange={(e) => setEditedTitle(e.target.value)}
-            onBlur={handleTitleSave}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleTitleSave();
-              } else if (e.key === 'Escape') {
-                setEditedTitle(data.title || data.type);
-                setIsEditingTitle(false);
-              }
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-            className="absolute -top-7 left-0 text-xs px-2 py-0.5 rounded font-medium bg-blue-500/20 text-blue-200 outline-none border border-blue-400"
-            style={{ minWidth: '60px' }}
-          />
-        ) : (
-          <div
-            className={`absolute -top-7 left-0 text-xs px-2 py-0.5 rounded font-medium transition-colors cursor-text ${selected ? 'bg-blue-500/20 text-blue-200' : 'text-neutral-600'}`}
-            onDoubleClick={(e) => {
-              e.stopPropagation();
-              setIsEditingTitle(true);
-            }}
-            title="Double-click to edit"
-          >
-            {data.title || data.type}
-          </div>
-        )}
+      {/* Relative wrapper for the Image Card to allow absolute positioning of controls below it */}
+      <div className="relative">
+        {/* Main Node Card - Video nodes are wider to fit more controls */}
+        <div
+          className={`relative ${data.type === NodeType.VIDEO ? 'w-[385px]' : 'w-[365px]'} rounded-2xl bg-[#0f0f0f] border transition-all duration-200 flex flex-col shadow-2xl ${selected ? 'border-blue-500/50 ring-1 ring-blue-500/30' : 'border-neutral-800'}`}
+        >
+          {/* Header (Editable Title) */}
+          {isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleTitleSave();
+                } else if (e.key === 'Escape') {
+                  setEditedTitle(data.title || data.type);
+                  setIsEditingTitle(false);
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute -top-7 left-0 text-xs px-2 py-0.5 rounded font-medium bg-blue-500/20 text-blue-200 outline-none border border-blue-400"
+              style={{ minWidth: '60px' }}
+            />
+          ) : (
+            <div
+              className={`absolute -top-7 left-0 text-xs px-2 py-0.5 rounded font-medium transition-colors cursor-text ${selected ? 'bg-blue-500/20 text-blue-200' : 'text-neutral-600'}`}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                setIsEditingTitle(true);
+              }}
+              title="Double-click to edit"
+            >
+              {data.title || data.type}
+            </div>
+          )}
 
-        {/* Content Area */}
-        <NodeContent
-          data={data}
-          inputUrl={inputUrl}
-          selected={selected}
-          isIdle={isIdle}
-          isLoading={isLoading}
-          isSuccess={isSuccess}
-          getAspectRatioStyle={getAspectRatioStyle}
-          onUpload={onUpload}
-          onExpand={onExpand}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-          onWriteContent={onWriteContent}
-          onTextToVideo={onTextToVideo}
-          onTextToImage={onTextToImage}
-          onImageToImage={onImageToImage}
-          onImageToVideo={onImageToVideo}
-          onUpdate={onUpdate}
-        />
-
-        {/* Control Panel - Only show if selected and NOT a Text node */}
-        {selected && data.type !== NodeType.TEXT && (
-          <NodeControls
+          {/* Content Area */}
+          <NodeContent
             data={data}
             inputUrl={inputUrl}
+            selected={selected}
+            isIdle={isIdle}
             isLoading={isLoading}
             isSuccess={isSuccess}
-            connectedImageNodes={connectedImageNodes}
+            getAspectRatioStyle={getAspectRatioStyle}
+            onUpload={onUpload}
+            onExpand={onExpand}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            onWriteContent={onWriteContent}
+            onTextToVideo={onTextToVideo}
+            onTextToImage={onTextToImage}
+            onImageToImage={onImageToImage}
+            onImageToVideo={onImageToVideo}
             onUpdate={onUpdate}
-            onGenerate={onGenerate}
-            onSelect={onSelect}
           />
+        </div>
+
+        {/* Control Panel - Positioned absolutely centered below the image card to prevent shifting the image */}
+        {selected && data.type !== NodeType.TEXT && (
+          <div className="absolute top-[calc(100%+12px)] left-1/2 -translate-x-1/2 w-[600px] flex justify-center z-[100]">
+            <NodeControls
+              data={data}
+              inputUrl={inputUrl}
+              isLoading={isLoading}
+              isSuccess={isSuccess}
+              connectedImageNodes={connectedImageNodes}
+              onUpdate={onUpdate}
+              onGenerate={onGenerate}
+              onSelect={onSelect}
+              zoom={zoom}
+            />
+          </div>
         )}
       </div>
     </div>
