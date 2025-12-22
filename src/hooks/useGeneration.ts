@@ -175,10 +175,10 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
                 // Check for frame-to-frame mode (explicit or auto-detected from 2+ image parents)
                 const hasMultipleInputs = imageParentIds.length >= 2;
                 const hasExplicitFrameInputs = node.frameInputs && node.frameInputs.length >= 2;
-                const isFrameToFrame = node.videoMode === 'frame-to-frame' || hasMultipleInputs || hasExplicitFrameInputs;
 
                 // Motion Reference logic (Kling 2.6)
                 let motionReferenceUrl: string | undefined;
+                let isMotionControl = false;
                 if (node.videoModel === 'kling-v2-6') {
                     // Find a parent video node that has a result
                     const videoParent = node.parentIds
@@ -187,8 +187,12 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
 
                     if (videoParent) {
                         motionReferenceUrl = videoParent.resultUrl;
+                        isMotionControl = true;
                     }
                 }
+
+                // Only evaluate as frame-to-frame if NOT in motion control mode
+                const isFrameToFrame = !isMotionControl && (node.videoMode === 'frame-to-frame' || hasMultipleInputs || hasExplicitFrameInputs);
 
                 if (isFrameToFrame && imageParentIds.length >= 2) {
                     // Get start and end frames from frameInputs (if user reordered) or default order
@@ -219,15 +223,27 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
                         if (parent2?.resultUrl) lastFrameBase64 = parent2.resultUrl;
                     }
                 } else if (imageParentIds.length > 0) {
-                    // Standard mode: get first parent image
-                    const parent = nodes.find(n => n.id === node.parentIds![0]);
+                    // Standard mode or Motion Control: get character reference or first parent image
+                    if (isMotionControl) {
+                        // For Motion Control, look specifically for an IMAGE parent as character reference
+                        const characterParent = node.parentIds
+                            ?.map(pid => nodes.find(n => n.id === pid))
+                            .find(n => n?.type === NodeType.IMAGE && n.resultUrl);
 
-                    if (parent?.type === NodeType.VIDEO && parent.lastFrame) {
-                        // Use last frame from parent video
-                        imageBase64 = parent.lastFrame;
-                    } else if (parent?.resultUrl) {
-                        // Use parent image directly
-                        imageBase64 = parent.resultUrl;
+                        if (characterParent?.resultUrl) {
+                            imageBase64 = characterParent.resultUrl;
+                        }
+                    } else {
+                        // Standard mode: get first parent image or video last frame
+                        const parent = nodes.find(n => n.id === node.parentIds![0]);
+
+                        if (parent?.type === NodeType.VIDEO && parent.lastFrame) {
+                            // Use last frame from parent video
+                            imageBase64 = parent.lastFrame;
+                        } else if (parent?.resultUrl) {
+                            // Use parent image directly
+                            imageBase64 = parent.resultUrl;
+                        }
                     }
                 }
 

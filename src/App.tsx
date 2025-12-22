@@ -761,7 +761,11 @@ export default function App() {
                   return node.parentIds
                     .map(parentId => nodes.find(n => n.id === parentId))
                     .filter(parent => parent && (parent.type === NodeType.IMAGE || parent.type === NodeType.VIDEO) && parent.resultUrl)
-                    .map(parent => ({ id: parent!.id, url: parent!.resultUrl!, type: parent!.type }));
+                    .map(parent => ({
+                      id: parent!.id,
+                      url: (parent!.type === NodeType.VIDEO ? parent!.lastFrame : parent!.resultUrl) || parent!.resultUrl!,
+                      type: parent!.type
+                    }));
                 })()}
                 onUpdate={updateNodeWithSync}
                 onGenerate={handleGenerate}

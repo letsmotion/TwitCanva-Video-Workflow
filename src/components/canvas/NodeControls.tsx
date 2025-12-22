@@ -421,6 +421,7 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
         return {
             nodeId: node.id,
             url: node.url,
+            type: node.type,
             order: existingInput?.order || (idx === 0 ? 'start' : 'end') as 'start' | 'end'
         };
     }).sort((a, b) => {
@@ -887,18 +888,51 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
                     {/* Advanced Settings Content - Only for Video nodes */}
                     {showAdvanced && isVideoNode && (
                         <div className="mt-3 space-y-3">
-                            {/* Frame Inputs - Show when 2+ images are connected */}
+                            {/* Frame Inputs - Show when 2+ nodes are connected */}
                             {connectedImageNodes.length >= 2 && (
                                 <div className="space-y-2">
                                     <label className="text-[10px] text-neutral-500 uppercase tracking-wider">
-                                        Connected Frames <span className="text-neutral-600">(drag to reorder)</span>
+                                        {videoGenerationMode === 'motion-control' ? 'Input References' : 'Connected Frames'}
+                                        {videoGenerationMode !== 'motion-control' && <span className="text-neutral-600"> (drag to reorder)</span>}
                                     </label>
 
                                     {frameInputsWithUrls.length === 0 ? (
                                         <div className="text-xs text-neutral-600 italic py-2">
-                                            Connect image nodes to use as start/end frames
+                                            {videoGenerationMode === 'motion-control' ? 'Connect video and image nodes as references' : 'Connect image nodes to use as start/end frames'}
+                                        </div>
+                                    ) : videoGenerationMode === 'motion-control' ? (
+                                        /* Horizontal layout for Motion Control */
+                                        <div className="flex gap-2">
+                                            {frameInputsWithUrls.map((input, index) => (
+                                                <div
+                                                    key={input.nodeId}
+                                                    className="flex-1 flex flex-col items-center gap-2 p-2 bg-neutral-800 rounded-lg border border-neutral-700/50"
+                                                >
+                                                    <div className="relative w-full aspect-video overflow-hidden rounded bg-black flex items-center justify-center">
+                                                        {input.url ? (
+                                                            <img
+                                                                src={input.url}
+                                                                alt={input.type === NodeType.VIDEO ? 'Motion Ref' : 'Character Ref'}
+                                                                className="w-full h-full object-contain"
+                                                            />
+                                                        ) : (
+                                                            <div className="text-[10px] text-neutral-600">No Preview</div>
+                                                        )}
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                                                        <div className="absolute bottom-1 left-1 right-1">
+                                                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded block text-center truncate ${input.type === NodeType.VIDEO
+                                                                ? 'bg-purple-600/80 text-white'
+                                                                : 'bg-blue-600/80 text-white'
+                                                                }`}>
+                                                                {input.type === NodeType.VIDEO ? 'MOTION REF' : 'CHARACTER REF'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     ) : (
+                                        /* Vertical draggable layout for Frame-to-Frame */
                                         <div className="space-y-2">
                                             {frameInputsWithUrls.map((input, index) => (
                                                 <div
@@ -937,7 +971,7 @@ const NodeControlsComponent: React.FC<NodeControlsProps> = ({
 
                                     {connectedImageNodes.length > frameInputsWithUrls.length && (
                                         <div className="text-xs text-neutral-500 mt-1">
-                                            {connectedImageNodes.length - frameInputsWithUrls.length} more connected image(s) available
+                                            {connectedImageNodes.length - frameInputsWithUrls.length} more input(s) available
                                         </div>
                                     )}
                                 </div>
