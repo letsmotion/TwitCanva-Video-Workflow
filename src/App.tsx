@@ -230,10 +230,16 @@ export default function App() {
   // Mark as dirty when nodes or title change
   const isInitialMount = React.useRef(true);
   const lastLoadingCountRef = React.useRef(0);
+  const ignoreNextChange = React.useRef(false);
 
   React.useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
+      return;
+    }
+
+    if (ignoreNextChange.current) {
+      ignoreNextChange.current = false;
       return;
     }
 
@@ -256,6 +262,7 @@ export default function App() {
 
   // Load workflow and update tracking
   const handleLoadWithTracking = async (id: string) => {
+    ignoreNextChange.current = true;
     await handleLoadWorkflow(id);
     setIsDirty(false);
   };
@@ -267,6 +274,7 @@ export default function App() {
 
   // Create new canvas
   const handleNewCanvas = () => {
+    ignoreNextChange.current = true;
     setNodes([]);
     setSelectedNodeIds([]);
     setCanvasTitle('Untitled Canvas');
@@ -692,6 +700,7 @@ export default function App() {
         setCanvasTitle={setCanvasTitle}
         setIsEditingTitle={setIsEditingTitle}
         setEditingTitleValue={setEditingTitleValue}
+        onSave={handleSaveWithTracking}
         onNew={handleNewCanvas}
         hasUnsavedChanges={hasUnsavedChanges}
         isChatOpen={isChatOpen}

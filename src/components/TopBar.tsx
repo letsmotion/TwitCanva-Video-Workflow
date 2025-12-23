@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { Plus, Save } from 'lucide-react';
+import { Plus, Save, Loader2 } from 'lucide-react';
 
 interface TopBarProps {
     // Title
@@ -17,7 +17,7 @@ interface TopBarProps {
     setIsEditingTitle: (editing: boolean) => void;
     setEditingTitleValue: (value: string) => void;
     // Actions
-    onSave: () => void;
+    onSave: () => void | Promise<void>;
     onNew: () => void;
     hasUnsavedChanges: boolean;
     lastAutoSaveTime?: number;
@@ -45,6 +45,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     onToggleTheme
 }) => {
     const [showNewConfirm, setShowNewConfirm] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     const handleTitleBlur = () => {
         if (editingTitleValue.trim()) {
@@ -80,10 +81,17 @@ export const TopBar: React.FC<TopBarProps> = ({
         }
     };
 
-    const handleSaveAndNew = () => {
-        onSave();
-        setShowNewConfirm(false);
-        onNew();
+    const handleSaveAndNew = async () => {
+        try {
+            setIsSaving(true);
+            await onSave();
+            setShowNewConfirm(false);
+            onNew();
+        } catch (error) {
+            console.error("Failed to save and new:", error);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleDiscardAndNew = () => {
@@ -133,7 +141,7 @@ export const TopBar: React.FC<TopBarProps> = ({
                         </div>
                     )}
                     <button
-                        onClick={onSave}
+                        onClick={() => onSave()}
                         className={`text-sm px-5 py-2.5 rounded-full flex items-center gap-2 transition-colors font-medium border ${canvasTheme === 'dark'
                             ? 'bg-neutral-800 hover:bg-neutral-700 text-white border-neutral-600'
                             : 'bg-neutral-100 hover:bg-neutral-200 text-neutral-900 border-neutral-300 shadow-sm'
@@ -180,21 +188,31 @@ export const TopBar: React.FC<TopBarProps> = ({
                         <div className="flex gap-3 justify-end">
                             <button
                                 onClick={() => setShowNewConfirm(false)}
-                                className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white text-sm transition-colors"
+                                disabled={isSaving}
+                                className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Cancel
                             </button>
                             <button
                                 onClick={handleDiscardAndNew}
-                                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm transition-colors"
+                                disabled={isSaving}
+                                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 Discard
                             </button>
                             <button
                                 onClick={handleSaveAndNew}
-                                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm transition-colors"
+                                disabled={isSaving}
+                                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                Save & New
+                                {isSaving ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    'Save & New'
+                                )}
                             </button>
                         </div>
                     </div>
