@@ -183,6 +183,7 @@ export default function App() {
 
   const {
     groups,
+    setGroups, // For workflow loading
     groupNodes,
     ungroupNodes,
     cleanupInvalidGroups,
@@ -216,6 +217,7 @@ export default function App() {
     viewport,
     canvasTitle,
     setNodes,
+    setGroups,
     setSelectedNodeIds,
     setCanvasTitle,
     setEditingTitleValue,
@@ -278,6 +280,7 @@ export default function App() {
   const handleNewCanvas = () => {
     ignoreNextChange.current = true;
     setNodes([]);
+    setGroups([]); // Reset groups for new canvas
     setSelectedNodeIds([]);
     setCanvasTitle('Untitled Canvas');
     setEditingTitleValue('Untitled Canvas');

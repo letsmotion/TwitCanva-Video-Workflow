@@ -151,6 +151,7 @@ export const useGroupManagement = () => {
 
     return {
         groups,
+        setGroups, // Expose for workflow loading
         groupNodes,
         ungroupNodes,
         cleanupInvalidGroups,

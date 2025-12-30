@@ -101,6 +101,12 @@ export const SelectionBoundingBox: React.FC<SelectionBoundingBoxProps> = ({
     const isGrouped = !!group;
     const showGroupButton = selectedNodes.length > 1 && !isGrouped;
 
+    // Calculate scale factor for UI elements - clamp to prevent elements from getting too large
+    // At zoom 1.0: scale = 1.0 (normal size)
+    // At zoom 0.5: scale = 1.5 (max clamped, instead of 2.0)
+    // At zoom 2.0: scale = 0.5 (smaller)
+    const uiScale = Math.min(1 / viewport.zoom, 1.5);
+
     // ============================================================================
     // RENDER
     // ============================================================================
@@ -174,11 +180,23 @@ export const SelectionBoundingBox: React.FC<SelectionBoundingBoxProps> = ({
                             }
                         }}
                         autoFocus
-                        className="absolute -top-8 left-0 text-sm font-medium text-white bg-indigo-600 px-3 py-1 rounded pointer-events-auto outline-none"
+                        className="absolute text-sm font-medium text-white bg-indigo-600 px-3 py-1 rounded pointer-events-auto outline-none"
+                        style={{
+                            top: -10,
+                            left: 0,
+                            transform: `scale(${uiScale}) translateY(-100%)`,
+                            transformOrigin: 'bottom left'
+                        }}
                     />
                 ) : (
                     <div
-                        className="absolute -top-8 left-0 text-sm font-medium text-white bg-indigo-600 px-3 py-1 rounded pointer-events-auto cursor-text"
+                        className="absolute text-sm font-medium text-white bg-indigo-600 px-3 py-1 rounded pointer-events-auto cursor-text"
+                        style={{
+                            top: -10,
+                            left: 0,
+                            transform: `scale(${uiScale}) translateY(-100%)`,
+                            transformOrigin: 'bottom left'
+                        }}
                         onDoubleClick={() => {
                             setEditedLabel(group.label);
                             setIsEditingLabel(true);
@@ -192,7 +210,13 @@ export const SelectionBoundingBox: React.FC<SelectionBoundingBoxProps> = ({
             {/* Group Button (when multiple nodes selected but not grouped) */}
             {showGroupButton && (
                 <div
-                    className="absolute -top-10 right-0 flex gap-2 pointer-events-auto"
+                    className="absolute flex gap-2 pointer-events-auto"
+                    style={{
+                        top: -10,
+                        right: 0,
+                        transform: `scale(${uiScale}) translateY(-100%)`,
+                        transformOrigin: 'bottom right'
+                    }}
                 >
                     <button
                         onClick={onGroup}
@@ -212,7 +236,13 @@ export const SelectionBoundingBox: React.FC<SelectionBoundingBoxProps> = ({
             {/* Group Toolbar (when grouped) */}
             {isGrouped && (
                 <div
-                    className="absolute -top-12 left-1/2 transform -translate-x-1/2 flex gap-2 pointer-events-auto"
+                    className="absolute flex gap-2 pointer-events-auto"
+                    style={{
+                        top: -10,
+                        left: '50%',
+                        transform: `translateX(-50%) scale(${uiScale}) translateY(-100%)`,
+                        transformOrigin: 'bottom center'
+                    }}
                 >
                     <button
                         className="bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white text-sm px-4 py-2.5 rounded flex items-center gap-2 transition-colors"
