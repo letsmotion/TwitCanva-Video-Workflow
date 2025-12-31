@@ -353,14 +353,14 @@ router.get('/generation-status/:nodeId', async (req, res) => {
         const imageMetaPath = path.join(IMAGES_DIR, `${nodeId}.json`);
         if (fs.existsSync(imageMetaPath)) {
             const meta = JSON.parse(fs.readFileSync(imageMetaPath, 'utf8'));
-            return res.json({ status: 'success', resultUrl: `/library/images/${meta.filename}`, type: 'image' });
+            return res.json({ status: 'success', resultUrl: `/library/images/${meta.filename}`, type: 'image', createdAt: meta.createdAt });
         }
 
         // Check videos metadata
         const videoMetaPath = path.join(VIDEOS_DIR, `${nodeId}.json`);
         if (fs.existsSync(videoMetaPath)) {
             const meta = JSON.parse(fs.readFileSync(videoMetaPath, 'utf8'));
-            return res.json({ status: 'success', resultUrl: `/library/videos/${meta.filename}`, type: 'video' });
+            return res.json({ status: 'success', resultUrl: `/library/videos/${meta.filename}`, type: 'video', createdAt: meta.createdAt });
         }
 
         res.json({ status: 'pending' });

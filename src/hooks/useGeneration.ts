@@ -107,7 +107,7 @@ export const useGeneration = ({ nodes, updateNode }: UseGenerationProps) => {
 
         if (!combinedPrompt && !isKlingFrameToFrame) return;
 
-        updateNode(id, { status: NodeStatus.LOADING });
+        updateNode(id, { status: NodeStatus.LOADING, generationStartTime: Date.now() });
 
         try {
             if (node.type === NodeType.IMAGE || node.type === NodeType.IMAGE_EDITOR) {

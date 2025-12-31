@@ -51,6 +51,7 @@ export interface NodeData {
   resolution: string;
   isPromptExpanded?: boolean; // Whether the prompt editing area is expanded
   resultAspectRatio?: string; // Actual aspect ratio of the generated image (e.g., '16/9')
+  generationStartTime?: number; // Timestamp when generation started (for recovery race condition prevention)
 }
 
 export interface ContextMenuState {

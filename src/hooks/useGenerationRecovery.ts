@@ -5,7 +5,7 @@
  * the backend to see if their generation has finished.
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { NodeData, NodeStatus } from '../types';
 import { extractVideoLastFrame } from '../utils/videoHelpers';
 
@@ -18,27 +18,42 @@ export const useGenerationRecovery = ({
     nodes,
     updateNode
 }: UseGenerationRecoveryOptions) => {
+    // Use a ref to access current nodes without causing re-renders
+    const nodesRef = useRef<NodeData[]>(nodes);
+    nodesRef.current = nodes;
 
     const checkStatus = useCallback(async (nodeId: string) => {
         try {
-            console.log(`[Recovery] Checking status for node ${nodeId}...`);
             const response = await fetch(`/api/generation-status/${nodeId}`);
             if (response.ok) {
                 const data = await response.json();
                 if (data.status === 'success' && data.resultUrl) {
-                    console.log(`[Recovery] SUCCESS: Found result for node ${nodeId}:`, data.resultUrl);
+                    // Access nodes via ref to avoid stale closure
+                    const node = nodesRef.current.find(n => n.id === nodeId);
+
+                    // Race condition check: If node has a generationStartTime, compare with result's createdAt
+                    // This prevents applying stale results from previous generations
+                    if (node?.generationStartTime && data.createdAt) {
+                        const resultCreatedAt = new Date(data.createdAt).getTime();
+                        if (resultCreatedAt < node.generationStartTime) {
+                            // Stale result, skip silently (don't spam console)
+                            return;
+                        }
+                    }
+
+                    console.log(`[Recovery] Found new result for node ${nodeId}`);
 
                     // Update node with success status and result URL
                     const updates: Partial<NodeData> = {
                         status: NodeStatus.SUCCESS,
                         resultUrl: data.resultUrl,
-                        errorMessage: undefined
+                        errorMessage: undefined,
+                        generationStartTime: undefined // Clear the timestamp after successful recovery
                     };
 
                     // If it's a video, extract the last frame for chaining
                     if (data.type === 'video') {
                         try {
-                            console.log(`[Recovery] Extracting last frame for video node ${nodeId}...`);
                             const lastFrame = await extractVideoLastFrame(data.resultUrl);
                             updates.lastFrame = lastFrame;
                         } catch (err) {
@@ -52,19 +67,22 @@ export const useGenerationRecovery = ({
         } catch (error) {
             console.error(`[Recovery] Error checking status for node ${nodeId}:`, error);
         }
-    }, [updateNode]);
+    }, [updateNode]); // Only updateNode as dependency, nodes accessed via ref
+
+    // Track loading node IDs for stable dependency
+    const loadingNodeIds = nodes
+        .filter(n => n.status === NodeStatus.LOADING)
+        .map(n => n.id)
+        .join(',');
 
     useEffect(() => {
-        // Find all nodes that are currently loading
-        const loadingNodes = nodes.filter(n => n.status === NodeStatus.LOADING);
+        if (!loadingNodeIds) return;
 
-        if (loadingNodes.length === 0) return;
+        const nodeIds = loadingNodeIds.split(',');
 
-        console.log(`[Recovery] Monitoring ${loadingNodes.length} loading nodes for results...`);
-
-        // Check each loading node immediately and then every 10 seconds
+        // Check each loading node every 10 seconds
         const checkAll = () => {
-            loadingNodes.forEach(node => checkStatus(node.id));
+            nodeIds.forEach(nodeId => checkStatus(nodeId));
         };
 
         checkAll(); // Initial check
@@ -72,5 +90,6 @@ export const useGenerationRecovery = ({
         const interval = setInterval(checkAll, 10000); // Check every 10s
 
         return () => clearInterval(interval);
-    }, [nodes, checkStatus]);
+    }, [loadingNodeIds, checkStatus]); // Stable string dependency instead of nodes array
 };
+
