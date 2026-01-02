@@ -193,7 +193,7 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
         onPointerDown={(e) => onNodePointerDown(e, data.id)}
         onContextMenu={(e) => onContextMenu(e, data.id)}
       >
-        <NodeConnectors nodeId={data.id} onConnectorDown={onConnectorDown} />
+        <NodeConnectors nodeId={data.id} onConnectorDown={onConnectorDown} canvasTheme={canvasTheme} />
 
         {/* Image Editor Node Card */}
         <div
@@ -256,7 +256,7 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
         onPointerDown={(e) => onNodePointerDown(e, data.id)}
         onContextMenu={(e) => onContextMenu(e, data.id)}
       >
-        <NodeConnectors nodeId={data.id} onConnectorDown={onConnectorDown} />
+        <NodeConnectors nodeId={data.id} onConnectorDown={onConnectorDown} canvasTheme={canvasTheme} />
 
         {/* Video Editor Node Card */}
         <div
@@ -329,7 +329,7 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <NodeConnectors nodeId={data.id} onConnectorDown={onConnectorDown} />
+      <NodeConnectors nodeId={data.id} onConnectorDown={onConnectorDown} canvasTheme={canvasTheme} />
 
       {/* Relative wrapper for the Image Card to allow absolute positioning of controls below it */}
       <div className="relative">
