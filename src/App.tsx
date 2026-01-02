@@ -1016,6 +1016,10 @@ export default function App() {
         initialModel={nodes.find(n => n.id === editorModal.nodeId)?.imageModel || 'gemini-pro'}
         initialAspectRatio={nodes.find(n => n.id === editorModal.nodeId)?.aspectRatio || 'Auto'}
         initialResolution={nodes.find(n => n.id === editorModal.nodeId)?.resolution || '1K'}
+        initialElements={nodes.find(n => n.id === editorModal.nodeId)?.editorElements as any}
+        initialCanvasData={nodes.find(n => n.id === editorModal.nodeId)?.editorCanvasData}
+        initialCanvasSize={nodes.find(n => n.id === editorModal.nodeId)?.editorCanvasSize}
+        initialBackgroundUrl={nodes.find(n => n.id === editorModal.nodeId)?.editorBackgroundUrl}
         onClose={handleCloseImageEditor}
         onGenerate={async (sourceId, prompt, count) => {
           handleCloseImageEditor();

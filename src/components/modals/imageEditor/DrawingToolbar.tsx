@@ -43,7 +43,7 @@ export const DrawingToolbar: React.FC<DrawingToolbarProps> = ({
     presetColors
 }) => {
     return (
-        <div className="flex justify-center py-3 relative z-50">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50">
             <div className="bg-[#2a2a2a] bg-opacity-95 backdrop-blur-sm rounded-xl border border-neutral-600 px-2 py-1.5 flex items-center gap-1 shadow-2xl">
                 {/* Brush Button with Settings Panel */}
                 <div className="relative">

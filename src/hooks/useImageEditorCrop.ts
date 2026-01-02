@@ -297,7 +297,7 @@ export const useImageEditorCrop = ({
                 throw new Error('Failed to generate cropped image');
             }
 
-            // Save state before applying crop for undo
+            // IMPORTANT: Save state BEFORE applying crop (captures pre-crop state for undo)
             saveState();
 
             // Pass cropped image to callback

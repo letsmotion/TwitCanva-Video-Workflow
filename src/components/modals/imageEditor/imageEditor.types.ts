@@ -47,6 +47,7 @@ export type EditorElement = ArrowElement | TextElement;
 export interface HistoryState {
     canvasData: string | null; // Base64 image data of brush canvas
     elements: EditorElement[];
+    imageUrl?: string; // Current image URL (for crop undo/redo)
 }
 
 /**
@@ -60,6 +61,10 @@ export interface ImageEditorModalProps {
     initialModel?: string;
     initialAspectRatio?: string;
     initialResolution?: string;
+    initialElements?: EditorElement[];
+    initialCanvasData?: string;
+    initialCanvasSize?: { width: number; height: number };
+    initialBackgroundUrl?: string; // Original/clean image for editing
     onClose: () => void;
     onGenerate: (id: string, prompt: string, count: number) => void;
     onUpdate: (id: string, updates: any) => void;

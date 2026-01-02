@@ -216,14 +216,14 @@ export const CanvasNode: React.FC<CanvasNodeProps> = ({
 
           {/* Content Area */}
           <div
-            className={`flex flex-col items-center justify-center ${inputUrl ? 'p-0' : 'p-6'}`}
-            style={{ minHeight: inputUrl ? 'auto' : '380px' }}
+            className={`flex flex-col items-center justify-center ${inputUrl || data.resultUrl ? 'p-0' : 'p-6'}`}
+            style={{ minHeight: inputUrl || data.resultUrl ? 'auto' : '380px' }}
           >
-            {inputUrl ? (
+            {inputUrl || data.resultUrl ? (
               <img
-                src={inputUrl}
-                alt="Input"
-                className={`rounded-xl w-full h-auto object-cover ${selected ? 'ring-2 ring-blue-500 shadow-2xl' : ''}`}
+                src={data.resultUrl || inputUrl}
+                alt="Content"
+                className={`rounded-xl w-full h-full object-cover ${selected ? 'ring-2 ring-blue-500 shadow-2xl' : ''}`}
                 style={{ maxHeight: '500px' }}
                 draggable={false}
               />

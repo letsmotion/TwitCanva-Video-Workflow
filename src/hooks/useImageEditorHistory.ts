@@ -18,6 +18,9 @@ interface UseImageEditorHistoryProps {
     setElements: React.Dispatch<React.SetStateAction<EditorElement[]>>;
     setSelectedElementId: React.Dispatch<React.SetStateAction<string | null>>;
     isOpen: boolean;
+    imageUrl?: string;
+    setImageUrl?: React.Dispatch<React.SetStateAction<string | undefined>>;
+    onImageUrlChange?: (url: string) => void; // Callback when image URL changes (for syncing to node)
 }
 
 interface UseImageEditorHistoryReturn {
@@ -40,7 +43,10 @@ export const useImageEditorHistory = ({
     elements,
     setElements,
     setSelectedElementId,
-    isOpen
+    isOpen,
+    imageUrl,
+    setImageUrl,
+    onImageUrlChange
 }: UseImageEditorHistoryProps): UseImageEditorHistoryReturn => {
     // --- State ---
     const [historyStack, setHistoryStack] = useState<HistoryState[]>([]);
@@ -52,11 +58,13 @@ export const useImageEditorHistory = ({
     const elementsRef = useRef<EditorElement[]>([]);
     const historyStackRef = useRef<HistoryState[]>([]);
     const redoStackRef = useRef<HistoryState[]>([]);
+    const imageUrlRef = useRef<string | undefined>(undefined);
 
     // Keep refs in sync with state
     elementsRef.current = elements;
     historyStackRef.current = historyStack;
     redoStackRef.current = redoStack;
+    imageUrlRef.current = imageUrl;
 
     // --- Capture/Save Functions ---
 
@@ -71,7 +79,8 @@ export const useImageEditorHistory = ({
 
         pendingStateRef.current = {
             canvasData,
-            elements: [...elementsRef.current]
+            elements: [...elementsRef.current],
+            imageUrl: imageUrlRef.current
         };
     }, [canvasRef]);
 
@@ -87,7 +96,7 @@ export const useImageEditorHistory = ({
     }, []);
 
     /**
-     * Legacy saveState for immediate saves (e.g., single-step actions)
+     * Save current state immediately to history (for single-step actions like crop)
      */
     const saveState = useCallback(() => {
         if (isUndoRedoRef.current) return;
@@ -97,7 +106,8 @@ export const useImageEditorHistory = ({
 
         const newState: HistoryState = {
             canvasData,
-            elements: [...elementsRef.current]
+            elements: [...elementsRef.current],
+            imageUrl: imageUrlRef.current
         };
 
         setHistoryStack(prev => [...prev, newState]);
@@ -120,12 +130,13 @@ export const useImageEditorHistory = ({
 
         isUndoRedoRef.current = true;
 
-        // Save current state to redo stack
+        // Save current state to redo stack (including current image URL)
         const canvas = canvasRef.current;
         const currentCanvasData = canvas ? canvas.toDataURL() : null;
         const currentState: HistoryState = {
             canvasData: currentCanvasData,
-            elements: [...elementsRef.current]
+            elements: [...elementsRef.current],
+            imageUrl: imageUrlRef.current
         };
         setRedoStack(prev => [...prev, currentState]);
 
@@ -134,6 +145,12 @@ export const useImageEditorHistory = ({
 
         // Restore previous state
         setElements(previousState.elements);
+
+        // Restore image URL if it changed (for crop undo)
+        if (previousState.imageUrl !== undefined && previousState.imageUrl !== imageUrlRef.current) {
+            setImageUrl?.(previousState.imageUrl);
+            onImageUrlChange?.(previousState.imageUrl);
+        }
 
         // Restore canvas
         if (previousState.canvasData && canvas) {
@@ -156,7 +173,7 @@ export const useImageEditorHistory = ({
         }
 
         setSelectedElementId(null);
-    }, [canvasRef, setElements, setSelectedElementId]);
+    }, [canvasRef, setElements, setSelectedElementId, setImageUrl, onImageUrlChange]);
 
     /**
      * Redo last undone action
@@ -172,12 +189,13 @@ export const useImageEditorHistory = ({
 
         isUndoRedoRef.current = true;
 
-        // Save current state to history stack
+        // Save current state to history stack (including current image URL)
         const canvas = canvasRef.current;
         const currentCanvasData = canvas ? canvas.toDataURL() : null;
         const currentState: HistoryState = {
             canvasData: currentCanvasData,
-            elements: [...elementsRef.current]
+            elements: [...elementsRef.current],
+            imageUrl: imageUrlRef.current
         };
         setHistoryStack(prev => [...prev, currentState]);
 
@@ -186,6 +204,12 @@ export const useImageEditorHistory = ({
 
         // Restore next state
         setElements(nextState.elements);
+
+        // Restore image URL if it changed (for crop redo)
+        if (nextState.imageUrl !== undefined && nextState.imageUrl !== imageUrlRef.current) {
+            setImageUrl?.(nextState.imageUrl);
+            onImageUrlChange?.(nextState.imageUrl);
+        }
 
         // Restore canvas
         if (nextState.canvasData && canvas) {
@@ -208,7 +232,7 @@ export const useImageEditorHistory = ({
         }
 
         setSelectedElementId(null);
-    }, [canvasRef, setElements, setSelectedElementId]);
+    }, [canvasRef, setElements, setSelectedElementId, setImageUrl, onImageUrlChange]);
 
     // --- Keyboard Shortcuts ---
 

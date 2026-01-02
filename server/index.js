@@ -186,6 +186,24 @@ function sanitizeWorkflowNodes(nodes) {
             }
         }
 
+        // Check editorCanvasData for base64 data (Image Editor)
+        if (cleanNode.editorCanvasData && cleanNode.editorCanvasData.startsWith('data:')) {
+            const saved = saveBase64ToFile(cleanNode.editorCanvasData);
+            if (saved) {
+                cleanNode.editorCanvasData = saved.url;
+                sanitizedCount++;
+            }
+        }
+
+        // Check editorBackgroundUrl for base64 data (Image Editor)
+        if (cleanNode.editorBackgroundUrl && cleanNode.editorBackgroundUrl.startsWith('data:')) {
+            const saved = saveBase64ToFile(cleanNode.editorBackgroundUrl);
+            if (saved) {
+                cleanNode.editorBackgroundUrl = saved.url;
+                sanitizedCount++;
+            }
+        }
+
         return cleanNode;
     });
 

@@ -63,15 +63,37 @@ export const useImageEditorDrawing = ({
     const isDrawingRef = useRef(false);
     const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 
-    // --- Effects ---
-
     // Initialize canvas size when drawing mode is enabled
+    // IMPORTANT: Setting canvas.width or canvas.height clears the canvas content,
+    // so we only resize if dimensions actually changed, and we preserve content
     useEffect(() => {
         if (isDrawingMode && imageRef.current && canvasRef.current) {
             const img = imageRef.current;
             const canvas = canvasRef.current;
-            canvas.width = img.clientWidth;
-            canvas.height = img.clientHeight;
+            const targetWidth = img.clientWidth;
+            const targetHeight = img.clientHeight;
+
+            // Only resize if dimensions are different (to avoid clearing canvas)
+            if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+                // Save current canvas content before resizing
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                if (tempCtx && canvas.width > 0 && canvas.height > 0) {
+                    tempCtx.drawImage(canvas, 0, 0);
+                }
+
+                // Resize canvas
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+
+                // Restore content (scaled to new size if needed)
+                const ctx = canvas.getContext('2d');
+                if (ctx && tempCanvas.width > 0 && tempCanvas.height > 0) {
+                    ctx.drawImage(tempCanvas, 0, 0, targetWidth, targetHeight);
+                }
+            }
         }
     }, [isDrawingMode, imageRef, canvasRef]);
 

@@ -237,10 +237,19 @@ export const useImageEditorArrows = ({
         };
         setElements(prev => [...prev, newElement]);
 
+        // Clear the preview canvas since arrow is now in elements
+        const canvas = arrowCanvasRef.current;
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
         isDrawingArrowRef.current = false;
         setArrowStart(null);
         setArrowEnd(null);
-    }, [isArrowMode, arrowStart, arrowEnd, saveState, setElements]);
+    }, [isArrowMode, arrowStart, arrowEnd, saveState, setElements, arrowCanvasRef]);
 
     return {
         isArrowMode,

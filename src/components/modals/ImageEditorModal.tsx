@@ -5,7 +5,7 @@
  * and image generation controls. Refactored into modular components.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 // Types and constants
 import {
@@ -18,6 +18,7 @@ import {
 import { useImageEditorHistory } from '../../hooks/useImageEditorHistory';
 import { useImageEditorDrawing } from '../../hooks/useImageEditorDrawing';
 import { useImageEditorArrows, drawArrowWithStyle } from '../../hooks/useImageEditorArrows';
+import { uploadAsset } from '../../services/assetService';
 import { useImageEditorSelection } from '../../hooks/useImageEditorSelection';
 import { useImageEditorText } from '../../hooks/useImageEditorText';
 import { useImageEditorCrop } from '../../hooks/useImageEditorCrop';
@@ -39,6 +40,9 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     initialModel,
     initialAspectRatio,
     initialResolution,
+    initialElements,
+    initialCanvasData,
+    initialBackgroundUrl,
     onClose,
     onGenerate,
     onUpdate
@@ -55,14 +59,18 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     const [selectedAspectRatio, setSelectedAspectRatio] = useState(initialAspectRatio || 'Auto');
     const [selectedResolution, setSelectedResolution] = useState(initialResolution || '1K');
 
-    // --- Element State ---
-    const [elements, setElements] = useState<EditorElement[]>([]);
+    // --- Element State (persisted to node) ---
+    const [elements, setElements] = useState<EditorElement[]>(initialElements || []);
+
+    // --- Image State (for crop undo/redo) ---
+    const [localImageUrl, setLocalImageUrl] = useState<string | undefined>(imageUrl);
 
     // --- Refs ---
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const arrowCanvasRef = useRef<HTMLCanvasElement>(null);
     const selectCanvasRef = useRef<HTMLCanvasElement>(null);
     const textCanvasRef = useRef<HTMLCanvasElement>(null);
+    const elementsCanvasRef = useRef<HTMLCanvasElement>(null);
     const imageContainerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
     const textInputRef = useRef<HTMLInputElement>(null);
@@ -80,7 +88,10 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
         elements,
         setElements,
         setSelectedElementId: (id) => selection.setSelectedElementId(id),
-        isOpen
+        isOpen,
+        imageUrl: localImageUrl,
+        setImageUrl: setLocalImageUrl,
+        onImageUrlChange: (url) => onUpdate(nodeId, { resultUrl: url })
     });
 
     const drawing = useImageEditorDrawing({
@@ -109,13 +120,141 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
         setElements
     });
 
-    // Crop state and local image URL for showing cropped result
-    const [localImageUrl, setLocalImageUrl] = useState<string | undefined>(imageUrl);
+    // Helper to generate composite image (Background + Brush + Elements)
+    const generateCompositeImage = useCallback(async () => {
+        if (!imageRef.current) return null;
 
-    const handleCropApply = (croppedImageDataUrl: string) => {
-        // Update local preview and save to node
+        const width = imageRef.current.clientWidth;
+        const height = imageRef.current.clientHeight;
+
+        // Create a temporary canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+
+        // 1. Draw Background Image
+        if (localImageUrl) {
+            await new Promise<void>((resolve) => {
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve();
+                };
+                img.onerror = () => resolve();
+                img.src = localImageUrl;
+            });
+        }
+
+        // 2. Draw Brush Layer
+        if (canvasRef.current) {
+            ctx.drawImage(canvasRef.current, 0, 0, width, height);
+        }
+
+        // 3. Draw Elements (Arrows/Text)
+        elements.forEach(element => {
+            if (element.type === 'arrow') {
+                drawArrowWithStyle(
+                    ctx,
+                    element.startX,
+                    element.startY,
+                    element.endX,
+                    element.endY,
+                    element.color,
+                    element.lineWidth
+                );
+            } else if (element.type === 'text') {
+                ctx.font = `${element.fontSize}px ${element.fontFamily}`;
+                ctx.fillStyle = element.color;
+                ctx.textBaseline = 'top';
+                ctx.fillText(element.text, element.x, element.y);
+            }
+        });
+
+        return canvas.toDataURL('image/png');
+    }, [elements, localImageUrl]);
+
+    // Helper to persist canvas brush data AND composite image to node
+    const saveCanvasToNode = useCallback(async () => {
+        const canvas = canvasRef.current;
+        if (!canvas || !nodeId) return;
+
+        // 1. Get Brush Layer
+        const canvasData = canvas.toDataURL('image/png');
+
+        let savedCanvasDataUrl = canvasData;
+        let savedCompositeUrl = '';
+        let savedBackgroundUrl = localImageUrl || '';
+
+        try {
+            // Upload Brush Layer (if it has content)
+            savedCanvasDataUrl = await uploadAsset(canvasData, 'image', 'brush-layer');
+
+            // 2. Generate and Upload Composite
+            const compositeDataUrl = await generateCompositeImage();
+            if (compositeDataUrl) {
+                savedCompositeUrl = await uploadAsset(compositeDataUrl, 'image', 'composite-result');
+            }
+
+            // 3. Upload Background if it's base64 (clean crop or initial upload)
+            if (localImageUrl && localImageUrl.startsWith('data:')) {
+                savedBackgroundUrl = await uploadAsset(localImageUrl, 'image', 'clean-background');
+                // Update local state to use the new URL locally too
+                setLocalImageUrl(savedBackgroundUrl);
+            }
+        } catch (error) {
+            console.error("Failed to upload assets during save:", error);
+            // Fallback: continue with what we have (base64)
+            if (!savedCompositeUrl) {
+                const fallbackComposite = await generateCompositeImage();
+                if (fallbackComposite) savedCompositeUrl = fallbackComposite;
+            }
+        }
+
+        // Save URLs + size
+        const updates: any = {
+            editorCanvasData: savedCanvasDataUrl,
+            editorCanvasSize: { width: canvas.width, height: canvas.height }
+        };
+
+        if (savedCompositeUrl) {
+            updates.resultUrl = savedCompositeUrl;
+            if (savedBackgroundUrl) {
+                updates.editorBackgroundUrl = savedBackgroundUrl;
+            }
+        }
+
+        onUpdate(nodeId, updates);
+    }, [nodeId, onUpdate, generateCompositeImage, localImageUrl]);
+
+
+
+    const handleCropApply = async (croppedImageDataUrl: string) => {
+        // Update local preview immediately
         setLocalImageUrl(croppedImageDataUrl);
-        onUpdate(nodeId, { resultUrl: croppedImageDataUrl });
+
+        try {
+            // Upload the cropped image
+            const savedCropUrl = await uploadAsset(croppedImageDataUrl, 'image', 'crop-result');
+
+            // Update local state with server URL
+            setLocalImageUrl(savedCropUrl);
+
+            // Save clean crop as background and initial result
+            onUpdate(nodeId, {
+                resultUrl: savedCropUrl,
+                editorBackgroundUrl: savedCropUrl
+            });
+        } catch (error) {
+            console.error("Failed to upload crop:", error);
+            // Fallback
+            onUpdate(nodeId, {
+                resultUrl: croppedImageDataUrl,
+                editorBackgroundUrl: croppedImageDataUrl
+            });
+        }
     };
 
     const crop = useImageEditorCrop({
@@ -129,14 +268,143 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
 
     // --- Effects ---
 
-    // Reset state when modal opens with new data
+    // Track if we've initialized for this node to prevent re-initialization loops
+    const initializedNodeIdRef = useRef<string | null>(null);
+    const hasInitializedRef = useRef(false);
+
+    // Reset state when modal opens with a NEW node (not when our own updates change initialElements)
     useEffect(() => {
+        // Only initialize if modal is open AND we haven't initialized for this node yet
+        if (!isOpen) {
+            // Reset initialization flag when modal closes
+            hasInitializedRef.current = false;
+            initializedNodeIdRef.current = null;
+            return;
+        }
+
+        // Skip if we've already initialized for this node
+        if (hasInitializedRef.current && initializedNodeIdRef.current === nodeId) {
+            return;
+        }
+
+        // Initialize state from props
         setPrompt(initialPrompt || '');
         setSelectedModel(initialModel || 'gemini-pro');
         setSelectedAspectRatio(initialAspectRatio || 'Auto');
         setSelectedResolution(initialResolution || '1K');
-        setLocalImageUrl(imageUrl);
-    }, [initialPrompt, initialModel, initialAspectRatio, initialResolution, imageUrl]);
+        // Use initialBackgroundUrl (clean image) if available, otherwise imageUrl (might be composite or input)
+        setLocalImageUrl(initialBackgroundUrl || imageUrl);
+        setElements(initialElements || []);
+
+        hasInitializedRef.current = true;
+        initializedNodeIdRef.current = nodeId;
+    }, [isOpen, nodeId, initialPrompt, initialModel, initialAspectRatio, initialResolution, imageUrl, initialElements]);
+
+    // Restore brush canvas data from node when modal opens
+    useEffect(() => {
+        if (!isOpen || !initialCanvasData || !canvasRef.current || !imageRef.current) return;
+
+        const canvas = canvasRef.current;
+        const img = imageRef.current;
+
+        // Wait for image to be ready
+        const restoreCanvas = () => {
+            canvas.width = img.clientWidth;
+            canvas.height = img.clientHeight;
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const image = new Image();
+            image.onload = () => {
+                ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            };
+            image.src = initialCanvasData;
+        };
+
+        if (img.complete) {
+            restoreCanvas();
+        } else {
+            img.addEventListener('load', restoreCanvas, { once: true });
+        }
+    }, [isOpen, initialCanvasData]);
+
+    // Persist elements to node when they change (with debounce to avoid excessive updates)
+    const lastSavedElementsRef = useRef<string>('');
+    useEffect(() => {
+        if (!isOpen || !nodeId || !hasInitializedRef.current) return;
+
+        const elementsJson = JSON.stringify(elements);
+        // Only save if elements actually changed since last save
+        if (elementsJson !== lastSavedElementsRef.current) {
+            lastSavedElementsRef.current = elementsJson;
+
+            const saveUpdate = async () => {
+                const updates: any = { editorElements: elements };
+
+                // Also update composite image
+                const compositeUrl = await generateCompositeImage();
+                if (compositeUrl) {
+                    try {
+                        const uploadedCompositeUrl = await uploadAsset(compositeUrl, 'image', 'composite-result');
+                        updates.resultUrl = uploadedCompositeUrl;
+                    } catch (e) {
+                        console.error("Failed to upload composite update:", e);
+                        updates.resultUrl = compositeUrl; // Fallback
+                    }
+
+                    // Capture canvas size for accurate scaling in overlay
+                    if (imageRef.current) {
+                        updates.editorCanvasSize = {
+                            width: imageRef.current.clientWidth,
+                            height: imageRef.current.clientHeight
+                        };
+                    }
+                }
+
+                onUpdate(nodeId, updates);
+            };
+
+            saveUpdate();
+        }
+    }, [elements, isOpen, nodeId, onUpdate, generateCompositeImage]);
+
+    // Persist canvas data to node on brush strokes (debounced via saveState already captures this)
+
+    // Redraw elements canvas when elements change (for undo/redo support)
+    useEffect(() => {
+        const canvas = elementsCanvasRef.current;
+        const img = imageRef.current;
+        if (!canvas || !img) return;
+
+        // Ensure canvas size matches image
+        canvas.width = img.clientWidth;
+        canvas.height = img.clientHeight;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Clear and redraw all elements
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        elements.forEach(element => {
+            if (element.type === 'arrow') {
+                drawArrowWithStyle(
+                    ctx,
+                    element.startX,
+                    element.startY,
+                    element.endX,
+                    element.endY,
+                    element.color,
+                    element.lineWidth
+                );
+            } else if (element.type === 'text' && element.id !== text.editingTextId) {
+                ctx.font = `${element.fontSize}px ${element.fontFamily}`;
+                ctx.fillStyle = element.color;
+                ctx.textBaseline = 'top';
+                ctx.fillText(element.text, element.x, element.y);
+            }
+        });
+    }, [elements, text.editingTextId]);
 
     // --- Handlers ---
 
@@ -257,6 +525,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
                                     const img = e.currentTarget;
                                     const canvas = canvasRef.current;
                                     const arrowCanvas = arrowCanvasRef.current;
+                                    const elementsCanvas = elementsCanvasRef.current;
+
                                     if (canvas) {
                                         canvas.width = img.clientWidth;
                                         canvas.height = img.clientHeight;
@@ -264,6 +534,33 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
                                     if (arrowCanvas) {
                                         arrowCanvas.width = img.clientWidth;
                                         arrowCanvas.height = img.clientHeight;
+                                    }
+                                    if (elementsCanvas) {
+                                        elementsCanvas.width = img.clientWidth;
+                                        elementsCanvas.height = img.clientHeight;
+                                        // Redraw elements immediately after resize
+                                        const ctx = elementsCanvas.getContext('2d');
+                                        if (ctx) {
+                                            ctx.clearRect(0, 0, elementsCanvas.width, elementsCanvas.height);
+                                            elements.forEach(element => {
+                                                if (element.type === 'arrow') {
+                                                    drawArrowWithStyle(
+                                                        ctx,
+                                                        element.startX,
+                                                        element.startY,
+                                                        element.endX,
+                                                        element.endY,
+                                                        element.color,
+                                                        element.lineWidth
+                                                    );
+                                                } else if (element.type === 'text' && element.id !== text.editingTextId) {
+                                                    ctx.font = `${element.fontSize}px ${element.fontFamily}`;
+                                                    ctx.fillStyle = element.color;
+                                                    ctx.textBaseline = 'top';
+                                                    ctx.fillText(element.text, element.x, element.y);
+                                                }
+                                            });
+                                        }
                                     }
                                 }}
                             />
@@ -278,8 +575,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
                                 } : {}}
                                 onMouseDown={drawing.isDrawingMode ? drawing.startDrawing : undefined}
                                 onMouseMove={drawing.isDrawingMode ? drawing.draw : undefined}
-                                onMouseUp={drawing.isDrawingMode ? drawing.stopDrawing : undefined}
-                                onMouseLeave={drawing.isDrawingMode ? drawing.stopDrawing : undefined}
+                                onMouseUp={drawing.isDrawingMode ? () => { drawing.stopDrawing(); saveCanvasToNode(); } : undefined}
+                                onMouseLeave={drawing.isDrawingMode ? () => { drawing.stopDrawing(); saveCanvasToNode(); } : undefined}
                             />
                             {/* Arrow Canvas Overlay */}
                             {arrows.isArrowMode && (
@@ -294,36 +591,8 @@ export const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
                             )}
                             {/* Elements Canvas - Renders all stored elements (arrows and text) */}
                             <canvas
+                                ref={elementsCanvasRef}
                                 className="absolute inset-0 pointer-events-none"
-                                ref={(canvas) => {
-                                    if (canvas && imageRef.current) {
-                                        canvas.width = imageRef.current.clientWidth;
-                                        canvas.height = imageRef.current.clientHeight;
-                                        const ctx = canvas.getContext('2d');
-                                        if (ctx) {
-                                            ctx.clearRect(0, 0, canvas.width, canvas.height);
-                                            elements.forEach(element => {
-                                                if (element.type === 'arrow') {
-                                                    drawArrowWithStyle(
-                                                        ctx,
-                                                        element.startX,
-                                                        element.startY,
-                                                        element.endX,
-                                                        element.endY,
-                                                        element.color,
-                                                        element.lineWidth
-                                                    );
-                                                } else if (element.type === 'text' && element.id !== text.editingTextId) {
-                                                    // Render text elements (skip if currently editing)
-                                                    ctx.font = `${element.fontSize}px ${element.fontFamily}`;
-                                                    ctx.fillStyle = element.color;
-                                                    ctx.textBaseline = 'top';
-                                                    ctx.fillText(element.text, element.x, element.y);
-                                                }
-                                            });
-                                        }
-                                    }
-                                }}
                             />
                             {/* Text Mode Canvas - Click to place text */}
                             {text.isTextMode && (

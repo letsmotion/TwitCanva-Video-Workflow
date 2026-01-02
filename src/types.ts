@@ -59,6 +59,28 @@ export interface NodeData {
   klingSubjectIntensity?: number; // Subject reference intensity (0-100)
   detectedFaces?: { x: number; y: number; width: number; height: number }[]; // Detected face bounding boxes
   faceDetectionStatus?: 'idle' | 'loading' | 'success' | 'error'; // Face detection status
+
+  // Image Editor state persistence
+  editorElements?: Array<{
+    id: string;
+    type: 'arrow' | 'text';
+    // Arrow properties
+    startX?: number;
+    startY?: number;
+    endX?: number;
+    endY?: number;
+    color?: string;
+    lineWidth?: number;
+    // Text properties
+    x?: number;
+    y?: number;
+    text?: string;
+    fontSize?: number;
+    fontFamily?: string;
+  }>; // Elements (arrows, text) drawn in image editor
+  editorCanvasData?: string; // Base64 brush/eraser canvas data
+  editorCanvasSize?: { width: number; height: number }; // Size of the canvas when elements were saved (for scaling)
+  editorBackgroundUrl?: string; // Clean background image URL (without elements) for re-editing
 }
 
 export interface ContextMenuState {
