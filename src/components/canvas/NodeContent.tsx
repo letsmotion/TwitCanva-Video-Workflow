@@ -134,74 +134,44 @@ export const NodeContent: React.FC<NodeContentProps> = ({
                         </div>
                     )}
 
-                    {/* Overlay Actions - z-10 to appear above video controls */}
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover/image:opacity-100 transition-opacity z-10">
-                        {/* Upload Button for re-uploading */}
-                        {data.type === NodeType.IMAGE && onUpload && (
+                    {/* Overlay Actions - Only show for Video nodes (Image nodes have toolbar above) */}
+                    {data.type === NodeType.VIDEO && (
+                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover/image:opacity-100 transition-opacity z-10">
                             <button
-                                onClick={() => fileInputRef.current?.click()}
+                                onClick={() => data.resultUrl && onExpand?.(data.resultUrl)}
                                 onPointerDown={(e) => e.stopPropagation()}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-black/50 hover:bg-black/80 rounded-lg text-white backdrop-blur-md text-xs font-medium"
+                                className="p-1.5 bg-black/50 hover:bg-black/80 rounded-lg text-white backdrop-blur-md"
+                                title="View full size"
                             >
-                                <Upload size={12} />
-                                Upload
+                                <Maximize2 size={14} />
                             </button>
-                        )}
-                        <button
-                            onClick={() => data.resultUrl && onExpand?.(data.resultUrl)}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            className="p-1.5 bg-black/50 hover:bg-black/80 rounded-lg text-white backdrop-blur-md"
-                            title="View full size"
-                        >
-                            <Maximize2 size={14} />
-                        </button>
-                        {/* Post to X Button */}
-                        {onPostToX && data.resultUrl && (
+                            {/* Post to X Button */}
+                            {onPostToX && data.resultUrl && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onPostToX(data.id, data.resultUrl!, 'video');
+                                    }}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    className="p-1.5 bg-black/50 hover:bg-black/80 rounded-lg text-white backdrop-blur-md"
+                                    title="Post to X"
+                                >
+                                    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
+                                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                                    </svg>
+                                </button>
+                            )}
+                            {/* Download Button */}
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    const mediaType = data.type === NodeType.VIDEO ? 'video' : 'image';
-                                    onPostToX(data.id, data.resultUrl!, mediaType);
-                                }}
-                                onPointerDown={(e) => e.stopPropagation()}
-                                className="p-1.5 bg-black/50 hover:bg-black/80 rounded-lg text-white backdrop-blur-md"
-                                title="Post to X"
-                            >
-                                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
-                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                                </svg>
-                            </button>
-                        )}
-                        {/* Download Button */}
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                if (data.resultUrl) {
-                                    const filename = data.type === NodeType.VIDEO ? `video_${data.id}.mp4` : `image_${data.id}.png`;
-                                    console.log('[Download] Starting download:', { url: data.resultUrl, filename });
-
-                                    // Strip query string from URL for download
-                                    const cleanUrl = data.resultUrl.split('?')[0];
-
-                                    // Check if it's a base64 data URL
-                                    if (data.resultUrl.startsWith('data:')) {
-                                        // Direct download for base64
-                                        const link = document.createElement('a');
-                                        link.href = data.resultUrl;
-                                        link.download = filename;
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        document.body.removeChild(link);
-                                    } else {
-                                        // For file URLs, fetch with cache bypass and download as blob
+                                    e.preventDefault();
+                                    if (data.resultUrl) {
+                                        const filename = `video_${data.id}.mp4`;
+                                        const cleanUrl = data.resultUrl.split('?')[0];
                                         fetch(cleanUrl, { cache: 'no-store' })
-                                            .then(res => {
-                                                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                                                return res.blob();
-                                            })
+                                            .then(res => res.blob())
                                             .then(blob => {
-                                                console.log('[Download] Blob created:', blob.size, 'bytes');
                                                 const url = window.URL.createObjectURL(blob);
                                                 const link = document.createElement('a');
                                                 link.href = url;
@@ -210,11 +180,8 @@ export const NodeContent: React.FC<NodeContentProps> = ({
                                                 link.click();
                                                 document.body.removeChild(link);
                                                 window.URL.revokeObjectURL(url);
-                                                console.log('[Download] Complete');
                                             })
-                                            .catch(err => {
-                                                console.error('[Download] Failed:', err, cleanUrl);
-                                                // Fallback: try direct link download
+                                            .catch(() => {
                                                 const link = document.createElement('a');
                                                 link.href = cleanUrl;
                                                 link.download = filename;
@@ -224,36 +191,34 @@ export const NodeContent: React.FC<NodeContentProps> = ({
                                                 document.body.removeChild(link);
                                             });
                                     }
-                                } else {
-                                    console.warn('[Download] No resultUrl available');
-                                }
-                            }}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            className="p-1.5 bg-black/50 hover:bg-black/80 rounded-lg text-white backdrop-blur-md"
-                            title="Download"
-                        >
-                            <Download size={14} />
-                        </button>
-                        {/* Drag to Chat Handle */}
-                        <div
-                            draggable
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData('application/json', JSON.stringify({
-                                    nodeId: data.id,
-                                    url: data.resultUrl,
-                                    type: data.type === NodeType.IMAGE ? 'image' : 'video'
-                                }));
-                                e.dataTransfer.effectAllowed = 'copy';
-                                onDragStart?.(data.id, true);
-                            }}
-                            onDragEnd={() => onDragEnd?.()}
-                            className="p-1.5 bg-cyan-500/80 hover:bg-cyan-400 rounded-lg text-white backdrop-blur-md cursor-grab active:cursor-grabbing flex items-center gap-1"
-                            title="Drag to chat"
-                        >
-                            <GripVertical size={14} />
+                                }}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                className="p-1.5 bg-black/50 hover:bg-black/80 rounded-lg text-white backdrop-blur-md"
+                                title="Download"
+                            >
+                                <Download size={14} />
+                            </button>
+                            {/* Drag to Chat Handle */}
+                            <div
+                                draggable
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onDragStart={(e) => {
+                                    e.dataTransfer.setData('application/json', JSON.stringify({
+                                        nodeId: data.id,
+                                        url: data.resultUrl,
+                                        type: 'video'
+                                    }));
+                                    e.dataTransfer.effectAllowed = 'copy';
+                                    onDragStart?.(data.id, true);
+                                }}
+                                onDragEnd={() => onDragEnd?.()}
+                                className="p-1.5 bg-cyan-500/80 hover:bg-cyan-400 rounded-lg text-white backdrop-blur-md cursor-grab active:cursor-grabbing flex items-center gap-1"
+                                title="Drag to chat"
+                            >
+                                <GripVertical size={14} />
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             ) : data.type === NodeType.TEXT ? (
                 /* Text Node - Menu or Editing Mode */
