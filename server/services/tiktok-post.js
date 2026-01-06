@@ -222,10 +222,20 @@ export async function postVideo(sessionId, videoPath, postInfo) {
     // Get video file stats
     const stats = fs.statSync(videoPath);
     const videoSize = stats.size;
-    const chunkSize = Math.min(videoSize, 10 * 1024 * 1024); // 10MB chunks max
-    const totalChunks = Math.ceil(videoSize / chunkSize);
 
-    console.log(`[TikTok] Posting video: ${videoPath} (${(videoSize / 1024 / 1024).toFixed(2)}MB, ${totalChunks} chunks)`);
+    // TikTok allows single-chunk upload for files up to 64MB
+    // For simplicity, use single chunk (most generated videos are under 64MB)
+    const MAX_SINGLE_CHUNK = 64 * 1024 * 1024; // 64MB
+
+    if (videoSize > MAX_SINGLE_CHUNK) {
+        throw new Error(`Video too large (${(videoSize / 1024 / 1024).toFixed(2)}MB). Maximum is 64MB for direct upload.`);
+    }
+
+    // Use single chunk upload - chunk_size = video_size, total_chunk_count = 1
+    const chunkSize = videoSize;
+    const totalChunks = 1;
+
+    console.log(`[TikTok] Posting video: ${videoPath} (${(videoSize / 1024 / 1024).toFixed(2)}MB, single chunk)`);
 
     // Step 1: Initialize upload
     const initResponse = await fetch(TIKTOK_VIDEO_INIT_URL, {
